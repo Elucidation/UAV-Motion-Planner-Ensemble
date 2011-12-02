@@ -18,22 +18,22 @@ close all; clear all; clc;
 N = 100; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
 TURNS = 100; % Number of turns/iterations to run simulation
-FPS = 30; % Frames per second update speed, doesn't really matter since matlab will go at a max speed of like 15 fps anyway
+FPS = 10; % Frames per second update speed, doesn't really matter since matlab will go at a max speed of like 15 fps anyway
 
 % UAV initial values
-uav.pos = [40 60]'; % x,y position
-uav.angle = -180; % degrees, 0 degrees is facing along +x axis
+uav.pos = [30 20]'; % x,y position
+uav.vel = [3 7]'; % vx, vy velocity
+uav.angle = 0; % degrees, 0 degrees is facing along +x axis
 uav.fov = 90; % degrees, total field of view, 90 degrees is from angle-45 degrees to angle+45 degrees
 ROT_SPEED = 10; % rotation speed per turn for uav, in degrees, 0 = no motion
 %%%%%%%%
-
 
 %%%%%%%%
 % NOISE FILTER
 %%%%%%%%
 % Gaussian noise, zero mean and unit variance
 % As numViews increases, noise reaches zero exponentially
-noiseFilter = @(viewsCount,numPoints) randn(2,numPoints)./(1 + 0.1*[viewsCount; viewsCount].^1.4); % views must be vector of length numPoints
+noiseFilter = @(viewsCount,numPoints) randn(2,numPoints)./(0.1 + 0.1*[viewsCount; viewsCount].^1.1); % views must be vector of length numPoints
 
 
 %%%%%%%%
@@ -50,6 +50,7 @@ getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones
 getAngle = @(a,b) atan2( b(2,:)-a(2,:) , b(1,:)-a(1,:) ) * 180/pi;
 
 
+% SET POINTS HERE
 points = getRandPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
 views = zeros(1,N); % Number of times point has been seen before, this affects the noiseFilter as value passed into viewsCount (more = less noise)
 
@@ -84,7 +85,7 @@ for i = 1:TURNS
    % Statistics
    error =  sum( abs(whatYouSee - points(:,isVisible)).^2 , 2) ; % meanSquared
    %fprintf(stderr, 'Mean Squared Error for visible points: %g\n',mean(error) );
-   title(sprintf('Turn %i/%i : Visible: %i/%i  :  Errors  Min:%.2g  Max:%.2g  Mean:%.2g  STD:%.2g',i,TURNS, size(whatYouSee,2), N, min(error),max(error),mean(error),std(error) ) );
+   title(sprintf('Turn %i/%i : Visible: %i/%i  :  \n Errors  Min:%.2g  Max:%.2g  Mean:%.2g  STD:%.2g',i,TURNS, size(whatYouSee,2), N, min(error),max(error),mean(error),std(error) ) );
    hold off;
    uav.angle = uav.angle + ROT_SPEED;
    if (uav.angle < -180)
@@ -93,6 +94,7 @@ for i = 1:TURNS
        uav.angle = uav.angle - 360;
    end
    
+   uav.pos = uav.pos + uav.vel*(1.0/FPS);
    
    pause(1.0/FPS)
 end
