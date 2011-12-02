@@ -22,19 +22,11 @@ FPS = 10; % Frames per second update speed, doesn't really matter since matlab w
 
 % UAV initial values
 uav.pos = [30 20]'; % x,y position
-uav.vel = [3 7]'; % vx, vy velocity
+uav.vel = [4 6]'; % vx, vy velocity
 uav.angle = 0; % degrees, 0 degrees is facing along +x axis
 uav.fov = 90; % degrees, total field of view, 90 degrees is from angle-45 degrees to angle+45 degrees
 ROT_SPEED = 10; % rotation speed per turn for uav, in degrees, 0 = no motion
 %%%%%%%%
-
-%%%%%%%%
-% NOISE FILTER
-%%%%%%%%
-% Gaussian noise, zero mean and unit variance
-% As numViews increases, noise reaches zero exponentially
-noiseFilter = @(viewsCount,numPoints) randn(2,numPoints)./(0.1 + 0.1*[viewsCount; viewsCount].^1.1); % views must be vector of length numPoints
-
 
 %%%%%%%%
 % SETUP
@@ -70,7 +62,7 @@ for i = 1:TURNS
    clf;
    hold on;
    if size(isVisible,2) > 0
-       whatYouSee = points(:,isVisible) + noiseFilter(  views(isVisible),  size(points(isVisible),2)  );
+       whatYouSee = points(:,isVisible) + noiseFilter(  views(isVisible) );
    end
    plot(points(1,~isVisible),points(2,~isVisible),'k*'); % Plot all nonvisible points as black
    if size(whatYouSee,2) > 0
@@ -81,11 +73,12 @@ for i = 1:TURNS
    plot([ uav.pos(1) uav.pos(1)+10*cosd(uav.angle + uav.fov/2) uav.pos(1)+10*cosd(uav.angle + -uav.fov/2) uav.pos(1)] , ...
          [ uav.pos(2) uav.pos(2)+10*sind(uav.angle + uav.fov/2) uav.pos(2)+10*sind(uav.angle + -uav.fov/2) uav.pos(2)], 'g-') % UAV FOV lines
    axis( [ BBOX(1) BBOX(3) BBOX(2) BBOX(4) ],'equal'); % Order [x1 x2 y1 y2]
+   axis manual;
    
    % Statistics
    error =  sum( abs(whatYouSee - points(:,isVisible)).^2 , 2) ; % meanSquared
    %fprintf(stderr, 'Mean Squared Error for visible points: %g\n',mean(error) );
-   title(sprintf('Turn %i/%i : Visible: %i/%i  :  \n Errors  Min:%.2g  Max:%.2g  Mean:%.2g  STD:%.2g',i,TURNS, size(whatYouSee,2), N, min(error),max(error),mean(error),std(error) ) );
+   title(sprintf('Turn %i/%i : Visible: %i/%i\n Errors  Min:%.2g  Max:%.2g  Mean:%.2g  STD:%.2g',i,TURNS, size(whatYouSee,2), N, min(error),max(error),mean(error),std(error) ) );
    hold off;
    uav.angle = uav.angle + ROT_SPEED;
    if (uav.angle < -180)
