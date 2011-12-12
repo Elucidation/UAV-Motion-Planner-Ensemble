@@ -5,7 +5,8 @@ function [local_goal,termination_flag] = voronoi_planner(trees,robot,goal)
 % goal	: A 1x2 vector containing the X-Y coordinated of the goal
 % OUTPUT
 % local_goal : The x,y coordinates of the local voronoi vertex
-% termination_flag : 1 if the program should return that no path exists, 0 otherwise
+% termination_flag : 1 if the program should return that no path exists, 0
+% otherwise
 
 % Set up local variables, to be configured for specific runs
 threshold = 1;
@@ -15,9 +16,10 @@ local_goal = [];
 % Draw the vertices of regular polygons around the robot and goal to
 % represent them in teh voronoi space
 o_trees = trees; % Placeholder to format trees if input does not match expected
-[num_trees,junk] = size(o_trees);
+num_trees = size(o_trees,1); %[num_trees,junk] = size(o_trees);
 objects = [o_trees];
 temp = robot;
+%objects=[[objects];[temp(1,1)+1,temp(1,2)-1)];[temp(1,1),temp(1,2)+1];[temp(1,1),temp(
 objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
 temp = goal;
 objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
@@ -29,7 +31,7 @@ temp = [goal(1,1),robot(1,2)];
 objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
 
 % Debug line to show points
-%voronoi(objects(:,1),objects(:,2));
+voronoi(objects(:,1),objects(:,2),'b:');
 
 % Perform Voronoi decomposition of the explored region
 [v,c] = voronoin(objects);
@@ -80,8 +82,24 @@ end
 % Check to see if the robot is connected to the goal
 [reached_goal] = vertex_connect(min_distance(v,robot),min_distance(v,goal),edges);
 
+% Merge close edges
+for i=1:n
+	for j=1:n
+		if((edges(i,j) == 1 || edges(j,i) == 1) && sqrt((v(i,1)-v(j,1))^2 + (v(i,2)-v(j,2))^2) < 1)
+			for k=1:n
+				if (edges(i,k) == 1 || edges(j,k) == 1 || edges(k,i) == 1 || edges(k,j) == 1)
+					edges(i,k) = 1;
+					edges(j,k) = 1;
+					edges(k,i) = 1;
+					edges(k,j) = 1;
+				end
+			end
+		end
+	end
+end
+
 % Select the next best vertex to navigate to
-[next_v,score] = next_vertex(min_distance(v,robot),min_distance(v,goal),edges,v,5,0);
+[next_v,score] = next_vertex(min_distance(v,robot),min_distance(v,goal),edges,v,1,0);
 
 if (reached_goal == 1 && next_v ~= (min_distance(v,robot)))
     local_goal = v(next_v,:);
