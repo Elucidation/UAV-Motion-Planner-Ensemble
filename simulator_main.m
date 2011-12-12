@@ -69,33 +69,25 @@ for i = 1:TURNS
 
    %Ground truth
    figure(1);
-   clf;
-   hold on;
-   axis([BBOX(1),BBOX(3),BBOX(2),BBOX(4)]);
+   %clf;   
    
+   axis([BBOX(1),BBOX(3),BBOX(2),BBOX(4)]);
    scatter(robot_pos(1), robot_pos(2), 'r');
-   for j=1:N
-       if (views(j)==0)
-           scatter(obstacles(1,j),obstacles(2,j),'g');
-       else
-           scatter(obstacles(1,j),obstacles(2,j),'b');
-       end
-       
-       scatter(obstacleEstimate(1,j),obstacleEstimate(2,j),'m');
-   end
+   hold on;
+   scatter( obstacles(1,views==0),obstacles(2,views==0),'g');
+   scatter( obstacles(1,views==1),obstacles(2,views==1),'b');
+   scatter(obstacleEstimate(1,:),obstacleEstimate(2,:),'m');
+   hold off;
    
    % What we observe
    figure(2);
-   clf;
-   hold on;
+   %clf;
+   
    axis([BBOX(1),BBOX(3),BBOX(2),BBOX(4)]);
    scatter(robot_pos(1), robot_pos(2), 'r');
-   for j=1:N
-       if (views(j)==0)
-           scatter(obstacleEstimate(1,j),obstacleEstimate(2,j),'g');
-       else
-           scatter(obstacleEstimate(1,j),obstacleEstimate(2,j),'b');
-       end
-   end
+   hold on;
+   scatter( obstacleEstimate(1,views==0),obstacleEstimate(2,views==0),'g');
+   scatter( obstacleEstimate(1,views==1),obstacleEstimate(2,views==1),'b');
+   hold off;
    
 end

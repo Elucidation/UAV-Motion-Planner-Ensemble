@@ -1,4 +1,4 @@
-tic
+tic;pause(rand)
 RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(toc*1000000)*0+35));
 clear
 close all
