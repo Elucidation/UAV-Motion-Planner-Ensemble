@@ -1,4 +1,4 @@
-function [local_goal,termination_flag] = voronoi_planner(trees,robot,goal)
+function [local_goal,termination_flag,VX,VY] = voronoi_planner(trees,robot,goal)
 % INPUT
 % trees	: An Nx2 vector containing the X-Y coordinates of the trees
 % robot	: A 1x2 vector containing the X-Y coordinates of the robot
@@ -7,6 +7,9 @@ function [local_goal,termination_flag] = voronoi_planner(trees,robot,goal)
 % local_goal : The x,y coordinates of the local voronoi vertex
 % termination_flag : 1 if the program should return that no path exists, 0
 % otherwise
+% VX & VY are Voronoi edges for use : 
+%           plot(VX,VY,'-');
+%           set(h(1:end-1),'xliminclude','off','yliminclude','off')
 
 % Set up local variables, to be configured for specific runs
 threshold = 1;
@@ -31,7 +34,7 @@ temp = [goal(1,1),robot(1,2)];
 objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
 
 % Debug line to show points
-voronoi(objects(:,1),objects(:,2),'b:');
+[VX, VY] = voronoi(objects(:,1),objects(:,2));
 
 % SAM - Keep only unique along x/y
 objects = unique(objects,'rows');
