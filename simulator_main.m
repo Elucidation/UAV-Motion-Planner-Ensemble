@@ -48,7 +48,7 @@ load obstacle2;
 
 views = zeros(1,N); % Number of times point has been seen before, this affects the noiseFilter as value passed into viewsCount (more = less noise)
 obstacleEstimate = zeros(2,N); % Last (estimated) Known position of obstacles
-%obstacleCurrent = zeros(2,N); % Currently known obstacle positions
+obstacleLastKnown = zeros(2,N); % Last known all obstacles
 obstacleUncertainty = zeros(2,N); % Last (estimated) Known Error of points
 distances = zeros(1, N); % Init current distances between robot and obstacles
 robot_trail = zeros(TURNS,2); % Initialize robot position history
@@ -83,8 +83,15 @@ for i = 1:TURNS
    end
    
    noise = noiseFilt(  views );
-   obstacleEstimate = obstacles(:,views~=0) + noise(:,views~=0);
-   obstacleCurrent = obstacles(:,viewCurrent~=0) + noise(:,viewCurrent~=0);
+   % Newly seen variables
+   %obstacleLastKnown(:,views==1) = obstacles(:,views==1) + noise(:,views==1); 
+   % Currently seeing (update noise)
+   obstacleLastKnown(:,viewCurrent~=0) = obstacles(:,viewCurrent~=0) + noise(:,viewCurrent~=0);
+   
+   % Just known obstacles, vs obstacleLastKnown includes nonexistent
+   obstacleEstimate = obstacleLastKnown(:,views~=0);
+   obstacleCurrent = obstacleLastKnown(:,viewCurrent~=0);
+   %obstacleCurrent = obstacles(:,viewCurrent~=0) + noise(:,viewCurrent~=0);
    %obsKnown = objectsLastKnown(:,views~=0);
    obstacleUncertainty = noise;
    
@@ -211,8 +218,10 @@ for i = 1:TURNS
    plot([robot_trail(robot_trail(:,1)~=0,1); robot_pos(1)],...
         [robot_trail(robot_trail(:,2)~=0,2); robot_pos(2)],'b.-'); % Show robot position trail
    
-    % Plot robot position
+   % Plot robot position
    scatter(robot_pos(1), robot_pos(2),80, 'md','filled');
+   % Plot robot vision range
+   drawCircle(robot_pos(1),robot_pos(2), robot_rov, 'y-');
    
    % Plot local goal
    scatter(local_goal(1),local_goal(2),100,'cp','filled'); % Final goal plot
@@ -222,6 +231,7 @@ for i = 1:TURNS
    
    axis([BBOX(1),BBOX(3),BBOX(2),BBOX(4)]);
    %axis([BBOX(1),BBOX(3),BBOX(2),BBOX(4)]*2-50);
+   axis equal;
    hold off;
    
    aviobj = addframe(aviobj,getframe(gcf)); % Save to avi

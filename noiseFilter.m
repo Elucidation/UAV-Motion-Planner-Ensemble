@@ -13,7 +13,7 @@ function [filterV sigmaV] = noiseFilter()
 NOISE_MEAN = 0;
 % View of 1 = variance of MAX_VARIANCE
 MAX_VARIANCE = 10; % Worst possible error in x,y values (not distance, worst dist is sqrt(2*MAX_VARIANCE^2)
-MIN_VARIANCE = 0; % Best possible error in x,y values
+MIN_VARIANCE = 0.0001; % Best possible error in x,y values
 POWR = 1.4; % Exponential factor (1+, higher equals faster noise loss)
 PERFECT_VIEW = 30; % At how many views till no noise
 
