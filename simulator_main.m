@@ -1,19 +1,26 @@
 close all; clear ; clc;
 % What this file does:
-% Sets up a field
-% Black stars are points that exist but aren't currently visible
-% Red X's are points that are visible, that is their 'actual' location, but not what we see
-% Blue circles are points that are visible, that is the location we see after noise is added
-
-% It also uses getVisible.m to get whether angles are in field of view
+% Sets up a 2D simulation of a robot navigating an obstacle filled area
+% Robot is considered a point with a 360 range of view
+% Obstacles have actual locations (ground truths) and 
+%    estimated locations based on # of times seen (using a noise filter variation of normal distribution)
+%
+% Two planners are implemented at different scales
+%  Globally - A Voronoi diagram is built based on 'all objects ever seen' and their estimated locations
+%    This planner A*/DFS nodes to the global goal, choosing a local goal avoiding some global minima
+%  Locally - A Potential Field is built based on currently visible obstacle uncertainties & distances to robot
+$    This planner is used to guide a robot to the local goal, on a smaller step size than global plan
 
 % Right now the noise function only takes into account number of times point has previously been viewed
 % It would be interesting to make noise also a function of distance, which can be implemented easily
 % Any noise filter you'd like to implement should take an output of the format:
 % 2xN for N visible points, then it can just directly replace the current noiseFilter
+
+%% RANDOM SEED
+% Reset random generator to initial state for repeatability of tests
 % RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
 reset(RandStream.getDefaultStream)
-% for i = 1:15;rand;end
+
 %% USER DEFINED Values
 
 % Simulator
@@ -127,10 +134,8 @@ for i = 1:TURNS
    % update noise only for those currently seeing 
    obstacleLastKnown(:,viewCurrent~=0) = obstacles(:,viewCurrent~=0) + noise(:,viewCurrent~=0);
    
-   % only obstacles that have ever been visible
-   obstacleEstimate = obstacleLastKnown(:,views~=0);
-   % Only currently visible obstacles (no 0's)
-   obstacleCurrent = obstacleLastKnown(:,viewCurrent~=0);
+   obstacleEstimate = obstacleLastKnown(:,views~=0); % only obstacles that have ever been visible
+   obstacleCurrent = obstacleLastKnown(:,viewCurrent~=0); % Only currently visible obstacles (no 0's)
    
    obstacleObjects = cell(1,sum(viewCurrent));
    for k = 1:sum(viewCurrent)
@@ -194,6 +199,7 @@ for i = 1:TURNS
    
    
    %% GRAPHICS -----------------------------------------
+   
    %% START GLOBAL PLOT - What we observe ( RIGHT FIGURE)
    figure(fh2);
    % Plot VORONOI LINES
@@ -231,6 +237,7 @@ for i = 1:TURNS
    title(sprintf('%i Obstacles, Turn %i : Distance to Global Goal = %g\nClosest Encounter = %g @ P(%g,%g)',N,i,getDist(robot_pos,global_goal),closestEncounter,closestPos(1),closestPos(2)));
    legend([robotPosH localGoalH globalGoalH observedObsH groundTruthH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location',LEGEND_POS);
    hold off;
+   
    % write AVI of GLOBAL
    if DO_AVI
        f2 = getframe(fh2);
