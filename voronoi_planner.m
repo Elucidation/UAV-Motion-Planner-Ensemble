@@ -12,7 +12,7 @@ function [local_goal,termination_flag,VX,VY] = voronoi_planner(trees,robot,goal)
 %           set(h(1:end-1),'xliminclude','off','yliminclude','off')
 
 % Set up local variables, to be configured for specific runs
-threshold = 1;
+threshold = 5;
 termination_flag = 0;
 local_goal = [];
 

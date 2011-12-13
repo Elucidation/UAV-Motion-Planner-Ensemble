@@ -24,7 +24,7 @@ global_goal = [48 50]; % Global goal position (must be in BBOX)
 % Robot
 robot_pos = [10 10]; % x,y position
 robot_rov = 15; % Range of view
-DMAX = 5; % max robot movement in one turn
+DMAX = 2; % max robot movement in one turn
 MINDIST = 0.1; % Minimum distance from goal score
 TRAIL_STEP_SIZE = 0.1; % minimum distance of each trail step
 
@@ -149,14 +149,16 @@ for i = 1:TURNS
    % If Voronoi is being bad, ignore it
    if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
        local_goal = global_goal; % global goal is closer than local goal
-   elseif (getDist(robot_pos,local_goal) < DMAX) 
-       % If Voroni local goal is closer than DMAX, just go there and again.
-       fprintf(' JUMP ');
-       robot_pos = local_goal;
-       if getDist(robot_pos,robot_trail(end,:)) >= TRAIL_STEP_SIZE
-           robot_trail(end+1,:) = robot_pos; % Keep history of robot positions;
-       end
-       continue;
+%    elseif (getDist(robot_pos,local_goal) < DMAX)  
+%        % SPECIAL CASE - if local goal < DMAX just go there directly and
+%        %   skip everything else
+%        % If Voroni local goal is closer than DMAX, just go there and again.
+%        fprintf(' JUMP ');
+%        robot_pos = local_goal;
+%        if getDist(robot_pos,robot_trail(end,:)) >= TRAIL_STEP_SIZE
+%            robot_trail(end+1,:) = robot_pos; % Keep history of robot positions;
+%        end
+%        continue;
    end
    
    
