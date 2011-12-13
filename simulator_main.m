@@ -26,6 +26,7 @@ robot_pos = [10 20]; % x,y position
 robot_rov = 15; % Range of view
 DMAX = 3; % max robot movement in one turn
 MINDIST = 1; % Minimum distance from goal score
+TRAIL_STEP_SIZE = 0.5; % minimum distance of each trail step
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
 DO_LOCAL = false; % plot local planner contour figure
@@ -61,7 +62,7 @@ views = zeros(1,N); % Number of times point has been seen before, this affects t
 obstacleEstimate = zeros(2,N); % Last (estimated) Known position of obstacles
 obstacleLastKnown = zeros(2,N); % Last known all obstacles
 distances = zeros(1, N); % Init current distances between robot and obstacles
-robot_trail = zeros(TURNS,2); % Initialize robot position history
+robot_trail = robot_pos;%zeros(TURNS,2); % Initialize robot position history
 
 % Axis & Views
 AX = [BBOX(1),BBOX(3),BBOX(2),BBOX(4)];
@@ -160,7 +161,7 @@ for i = 1:TURNS
    if size(local_goal_path,1) == 1
        checkRepeat0It = checkRepeat0It + 1;
        if (checkRepeat0It > 10)
-           % Stuck in equilibrium, apply nudge
+           % Stuck in equilibrium, apply nudge towards local goal
            local_goal_path = [local_goal_path;local_goal];
            checkRepeat0It = 0;
        end
@@ -171,7 +172,9 @@ for i = 1:TURNS
    d = 0; k = 0;
    % Update Robot position along local path trail for distance DMAX
    while d < DMAX
-       robot_trail(i,:) = robot_pos; % Keep history of robot positions;
+       if getDist(robot_pos,robot_trail(end,:)) >= TRAIL_STEP_SIZE
+           robot_trail(end+1,:) = robot_pos; % Keep history of robot positions;
+       end
        if getDist(robot_pos,global_goal) < MINDIST % Found the goal!
            fprintf('You made it in %i steps.\n',i);
            foundGoal = 1;
