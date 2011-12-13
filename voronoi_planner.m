@@ -33,6 +33,9 @@ objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[t
 % Debug line to show points
 voronoi(objects(:,1),objects(:,2),'b:');
 
+% SAM - Keep only unique along x/y
+objects = unique(objects,'rows');
+
 % Perform Voronoi decomposition of the explored region
 [v,c] = voronoin(objects);
 

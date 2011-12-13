@@ -1,5 +1,6 @@
 function [x delf] = graddesc(func, x0, goal)
-step = 50;
+step = 25;
+maxstep = 3;
 delftol = 1e-3;
 dxtol = 1e-3;
 goaltol = 1;
@@ -14,7 +15,7 @@ while (~done)
         continue
     end
     unit = -delf(end,:) / norm(-delf(end,:));
-    xnew = x(end,:) + step * norm(delf(end,:)) * unit;
+    xnew = x(end,:) + min(step * norm(delf(end,:)), maxstep) * unit;
     delfnew = grad2(func, xnew);
     x = [x; xnew];
     delf = [delf; delfnew];

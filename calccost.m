@@ -1,5 +1,4 @@
-function val = calccost(pos,obs,goal,goalfunc)
-MAXDIST = 4;
+function val = calccost(pos,obs,goal,goalfunc,obsdistlim)
 
 if (isempty(goalfunc))
     goalfunc = 'linear';
@@ -26,8 +25,7 @@ for i = 1:length(obs)
     if (isnan(obval))
         obval = 0;
     end
-    maxdist = MAXDIST;
-    obval = obval + max((maxdist-norm([ob.x ob.y]-[x y]))/maxdist, 0);
+    obval = obval + max(1/5*(obsdistlim-norm([ob.x ob.y]-[x y]))/obsdistlim, 0);
     val = val + obval;
 end
 switch (goalfunc)

@@ -11,38 +11,40 @@ close all; clear all; clc;
 % It would be interesting to make noise also a function of distance, which can be implemented easily
 % Any noise filter you'd like to implement should take an output of the format:
 % 2xN for N visible points, then it can just directly replace the current noiseFilter
-
+reset(RandStream.getDefaultStream)
 
 %% USER DEFINED Values
 [noiseFilt sigmaV] = noiseFilter(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
 %sigmaV = @(x) 0; % Zero sigma function
 
 TURNS = 100; % Number of turns to simulate
-N = 5; % Number of points in playing field
+N = 20; % Number of points in playing field
 
-BBOX = [0 0 20 20]; % playing field bounding box [x1 y1 x2 y2]
-%ax = [0 100 0 100 0 100];
-ax = [0 20 0 20];
+BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
+ax = [0 100 0 100 0 100];
+%BBOX = [0 0 20 20]; % playing field bounding box [x1 y1 x2 y2]
+%ax = [0 20 0 20];
 azel = [-123.5 58]; % for view in saving files
 
 
-global_goal = [18 10]; % Change this if BBOX changes
+global_goal = [90 80]; % Change this if BBOX changes
 
 robot_pos = [2 10]; % x,y position
-robot_rov = 40; % Range of view
-DMAX = 1; % max robot movement in one turn
-MINDIST=2; % Minimum distance from goal score
+robot_rov = 20; % Range of view
+DMAX = 5; % max robot movement in one turn
+MINDIST = 1; % Minimum distance from goal score
 
 %% SETUP
 getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones(1,N)*(x2-x1); ones(1,N)*(y2-y1)];
 getDist = @(a,b) sqrt((b(2)-a(2))^2 + (b(1)-a(1))^2);
 %obstacles = getRandPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
+load obstacle2;
 %load obstacles;
-obstacles = [10 15; 
-             10 5;
-             10 10;
-             10 2;
-             10 18;]';
+% obstacles = [10 15; 
+%              10 5;
+%              10 10;
+%              10 2;
+%              10 18;]';
 
 views = zeros(1,N); % Number of times point has been seen before, this affects the noiseFilter as value passed into viewsCount (more = less noise)
 obstacleEstimate = zeros(2,N); % Last (estimated) Known position of obstacles
@@ -56,9 +58,14 @@ fprintf(2,'Black stars - Points exist but not currently visible\n');
 fprintf(2,'       Red X - Visible Points, Actual location\n');
 fprintf(2,'Blue circles - Visible Points, Noisy Location\n\n');
 
-%aviobj = avifile('sim3d_T20_local_minima.avi','compression','None');
+
+% AVI FILES
+aviobj = avifile('simAll_2D_1.avi','compression','None','fps',5);
+aviobj2 = avifile('simAll_contour_1.avi','compression','None','fps',5);
 
 foundGoal = 0;
+checkRepeat0It = 0;
+
 %% MAIN LOOP -----------------------------------------------
 for i = 1:TURNS
    fprintf('TURN %i : ',i);
@@ -85,7 +92,8 @@ for i = 1:TURNS
    for k = 1:sum(viewCurrent)
        obstacleObjects{k}.x = obstacleCurrent(1,k);
        obstacleObjects{k}.y = obstacleCurrent(2,k);
-       v = views(views~=0);
+       %v = views(views~=0);
+       v = views(logical(viewCurrent));
        obstacleObjects{k}.sig = sigmaV(v(k));
    end
    
@@ -104,12 +112,23 @@ for i = 1:TURNS
    % obstacleEstimate' has every obstacle ever seen
    local_goal = voronoi_planner(obstacleEstimate', robot_pos, global_goal);
 %    local_goal = robot_pos+20*(global_goal-robot_pos)/getDist(robot_pos,global_goal); % 10% towards global_goal
-%    if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
-%        local_goal = global_goal; % global goal is closer than local goal
-%    end
+   
+   % If Voronoi is being bad, ignore it
+   if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
+       local_goal = global_goal; % global goal is closer than local goal
+   end
+   
    % Only given those obstacles it currently sees
    local_goal_path = localplan(robot_pos, local_goal, obstacleObjects);
    %local_goal_path = localplan(robot_pos, global_goal, obstacleObjects);
+   if size(local_goal_path,1) == 1
+       checkRepeat0It = checkRepeat0It + 1;
+       if (checkRepeat0It > 10)
+           % Stuck in equilibrium, apply nudge
+           local_goal_path = [local_goal_path;local_goal];
+           checkRepeat0It = 0;
+       end
+   end
    
    
    %% Update Robot
@@ -205,6 +224,8 @@ for i = 1:TURNS
    %axis([BBOX(1),BBOX(3),BBOX(2),BBOX(4)]*2-50);
    hold off;
    
+   aviobj = addframe(aviobj,getframe(gcf)); % Save to avi
+   
    
    % Plot 3D Contour path
    fh1 = figure(1); % 3D Contour Figure (Left)
@@ -214,12 +235,12 @@ for i = 1:TURNS
    pos(1:2) = [160 278];
    set(gcf, 'position', pos);
    axis(ax);
-   %view(azel);
+   view(azel);
    view(2);
    
    % SAVE FIG AND AVI
    %saveas(gcf,sprintf('localMinima%i',i),'fig');
-   %aviobj = addframe(aviobj,getframe(gcf)); % Save to avi
+   aviobj2 = addframe(aviobj2,getframe(fh1)); % Save to avi
    
    %% END GRAPHICS ---------------------
    
@@ -231,7 +252,12 @@ for i = 1:TURNS
    if (foundGoal == 1)
        break
    end
+   if (sum(std(robot_trail(max(1,i-10):i,:)).^2) < 0.3)
+       disp('Stuck in Loop.')
+       break
+   end
    pause(0.0001);
    %pause
 end
-%aviobj = close(aviobj);
+aviobj = close(aviobj);
+aviobj2 = close(aviobj2);
