@@ -1,5 +1,5 @@
-function h = plotlocal(obs, goal, path, bounds, h)
-if (nargin == 3 || (nargin > 3 && isempty(bounds)))
+function h = plotlocal(obs, goal, path, closedist, bounds, h)
+if (nargin == 4 || (nargin > 4 && isempty(bounds)))
     minx = min([path(:,1); goal(1)]);
     miny = min([path(:,2); goal(2)]);
     maxx = max([path(:,1); goal(1)]);
@@ -21,7 +21,7 @@ sizey = maxy - miny + 1;
 cost = zeros(sizey,sizex);
 for x = 1:sizex
     for y = 1:sizey
-        cost(y,x) = calccost([x+minx-1 y+miny-1], obs, goal, 'linear2', 1.5);
+        cost(y,x) = calccost([x+minx-1 y+miny-1], obs, goal, 'linear2', closedist);
     end
 end
 startpos = [path(1,:) interp2((1:sizex)+minx-1, (1:sizey)+miny-1, cost, path(1,1), path(1,2))];
@@ -30,7 +30,7 @@ for i = 1:length(path(:,1))
         pathtoplot(i,:) = [path(i,1) path(i,2) interp2((1:sizex)+minx-1, (1:sizey)+miny-1, cost, path(i,1), path(i,2))];
     end
 end
-if (nargin == 5)
+if (nargin == 6)
     figure(h)
     hold off
 else

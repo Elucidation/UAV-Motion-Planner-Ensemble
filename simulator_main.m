@@ -1,4 +1,4 @@
-close all; clear all; clc;
+close all; clear ; clc;
 % What this file does:
 % Sets up a field
 % Black stars are points that exist but aren't currently visible
@@ -11,28 +11,33 @@ close all; clear all; clc;
 % It would be interesting to make noise also a function of distance, which can be implemented easily
 % Any noise filter you'd like to implement should take an output of the format:
 % 2xN for N visible points, then it can just directly replace the current noiseFilter
+% RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
 reset(RandStream.getDefaultStream)
-
+for i = 1:15;rand;end
 %% USER DEFINED Values
 
 % Simulator
-TURNS = 200; % Number of turns to simulate
-N = 200; % Number of points in playing field
-BBOX = [0 0 60 60]; % playing field bounding box [x1 y1 x2 y2]
-global_goal = [48 50]; % Global goal position (must be in BBOX)
+TURNS = 20000; % Number of turns to simulate
+N = 500; % Number of points in playing field
+BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
+global_goal = [90 90]; % Global goal position (must be in BBOX)
 
 % Robot
 robot_pos = [10 10]; % x,y position
-robot_rov = 15; % Range of view
+robot_rov = 25; % Range of view
 DMAX = 2; % max robot movement in one turn
 MINDIST = 0.1; % Minimum distance from goal score
 TRAIL_STEP_SIZE = 0.1; % minimum distance of each trail step
+TREE_SIZE = 1.2;    %The minimum distance we can pass from a tree. 
+                    %Affects which Voronoi edges are pruned in global
+                    %and cost of getting close to a tree in local
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
-DO_LOCAL = true; % plot local planner contour figure
-FIG_SIZE = [560 420]*1.5; % Both Figure sizes
-FIG_POS1 = [50 150]; % Local figure position
-FIG_POS2 = [920 150]; % Global figure position
+DO_LOCAL = false; % plot local planner contour figure
+FIG_SIZE = [1900 1050];%[560 420]*1.5; % Both Figure sizes
+FIG_POS1 = [10 65];%[50 150]; % Local figure position
+FIG_POS2 = [10 65];%[920 150]; % Global figure position
+LEGEND_POS = 'EastOutside';
 
 % AVI FILES
 Global_filename = sprintf('simAll_2D_6_ROV%i_N%i.avi',robot_rov,N); 
@@ -139,7 +144,7 @@ for i = 1:TURNS
    
    %%% VORONOI PLANNER - Determine Local Goal given known obstacles, and global goal
    % obstacleEstimate' has every obstacle ever seen
-   [local_goal,noPathExists,VX,VY] = voronoi_planner(obstacleEstimate', robot_pos, global_goal);
+   [local_goal,noPathExists,VX,VY,VXnew,VYnew] = voronoi_planner(obstacleEstimate', robot_pos, global_goal, TREE_SIZE);
 %    local_goal = robot_pos+20*(global_goal-robot_pos)/getDist(robot_pos,global_goal); % 10% towards global_goal
 
    if noPathExists
@@ -165,7 +170,7 @@ for i = 1:TURNS
    
    %%% LOCAL PLANNER - must come before Update Robot (needs local_goal and robot position)
    % Only given those obstacles it currently sees
-   local_goal_path = localplan(robot_pos, local_goal, obstacleObjects);
+   local_goal_path = localplan(robot_pos, local_goal, obstacleObjects, TREE_SIZE);
    %local_goal_path = localplan(robot_pos, global_goal, obstacleObjects);
    if size(local_goal_path,1) == 1
        checkRepeat0It = checkRepeat0It + 1;
@@ -193,9 +198,10 @@ for i = 1:TURNS
    figure(fh2);
    % Plot VORONOI LINES
    hold off;
-   plot(VX,VY,'b:');   
-   set(fh2(1:end-1),'xliminclude','off','yliminclude','off'); % keep infinite lines clipped
+   plot(VX,VY,':','Color',[0.8 0.8 0.8]); 
    hold on;
+   plot(VXnew,VYnew,'b:');   
+   set(fh2(1:end-1),'xliminclude','off','yliminclude','off'); % keep infinite lines clipped
    axis('equal'); axis(AX);
    
    % Observed Obstacles
@@ -222,7 +228,7 @@ for i = 1:TURNS
    localGoalH = scatter(local_goal(1),local_goal(2),100,'cp','filled'); % Plot local goal
    globalGoalH = scatter(global_goal(1),global_goal(2),150,'rp','filled'); % Plot global goal 
    title(sprintf('%i Obstacles, Turn %i : Distance to Global Goal = %g\nClosest Encounter = %g @ P(%g,%g)',N,i,getDist(robot_pos,global_goal),closestEncounter,closestPos(1),closestPos(2)));
-   legend([robotPosH localGoalH globalGoalH observedObsH groundTruthH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location','NorthWest');
+   legend([robotPosH localGoalH globalGoalH observedObsH groundTruthH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location',LEGEND_POS);
    hold off;
    % write AVI of GLOBAL
    if DO_AVI
@@ -235,7 +241,7 @@ for i = 1:TURNS
    
    %% START LOCAL PLOT - 3D Contour path for LOCAL Planner (ie. to Local goal)
    if DO_LOCAL
-       plotlocal(obstacleObjects, local_goal, local_goal_path, AX ,fh1); % new figure 3d contour
+       plotlocal(obstacleObjects, local_goal, local_goal_path, TREE_SIZE, AX ,fh1); % new figure 3d contour
        axis('equal'); axis(AX);
        view(azel);
        view(2);
@@ -279,7 +285,7 @@ for i = 1:TURNS
        % Update position 
        if (d > DMAX)
            % robot wants to move too far, so interpolate along distance
-           robot_pos = robot_pos + DMAX*(next_pos-robot_pos)/getDist(robot_pos,next_pos);
+           robot_pos = robot_pos + (DMAX-d+getDist(robot_pos,next_pos))*(next_pos-robot_pos)/getDist(robot_pos,next_pos);
        else
           robot_pos = next_pos; 
        end
@@ -294,9 +300,9 @@ for i = 1:TURNS
        break
    end
    
-   pause(0.5);
+%    pause(0.5); 
    %local_goal_path
-   %pause
+%    pause
 end
 
 %% Close AVI files
