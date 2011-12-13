@@ -17,16 +17,16 @@ reset(RandStream.getDefaultStream)
 
 % Simulator
 TURNS = 200; % Number of turns to simulate
-N = 100; % Number of points in playing field
+N = 200; % Number of points in playing field
 BBOX = [0 0 60 60]; % playing field bounding box [x1 y1 x2 y2]
 global_goal = [48 50]; % Global goal position (must be in BBOX)
 
 % Robot
 robot_pos = [10 10]; % x,y position
 robot_rov = 15; % Range of view
-DMAX = 3; % max robot movement in one turn
+DMAX = 5; % max robot movement in one turn
 MINDIST = 0.1; % Minimum distance from goal score
-TRAIL_STEP_SIZE = 0; % minimum distance of each trail step
+TRAIL_STEP_SIZE = 0.1; % minimum distance of each trail step
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
 DO_LOCAL = true; % plot local planner contour figure
@@ -37,7 +37,7 @@ FIG_POS2 = [920 150]; % Global figure position
 % AVI FILES
 Global_filename = sprintf('simAll_2D_6_ROV%i_N%i.avi',robot_rov,N); 
 Local_filename = sprintf('simAll_contour_6_ROV%i_N%i.avi',robot_rov,N);
-DO_AVI = true; % write any avi files at all (Global & Local)
+DO_AVI = false; % write any avi files at all (Global & Local)
 DO_LOCAL_AVI = true; % write contour avi file
 FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate below 5 which fails on avifile('fps',<5))
 
@@ -151,6 +151,7 @@ for i = 1:TURNS
        local_goal = global_goal; % global goal is closer than local goal
    elseif (getDist(robot_pos,local_goal) < DMAX) 
        % If Voroni local goal is closer than DMAX, just go there and again.
+       fprintf(' JUMP ');
        robot_pos = local_goal;
        if getDist(robot_pos,robot_trail(end,:)) >= TRAIL_STEP_SIZE
            robot_trail(end+1,:) = robot_pos; % Keep history of robot positions;
@@ -240,7 +241,7 @@ for i = 1:TURNS
        % SAVE FIG AND AVI
        %saveas(gcf,sprintf('localMinima%i',i),'fig');
        title(sprintf('Turn %i : Distance to Local Goal = %g',i,getDist(robot_pos,global_goal)));
-       if DO_LOCAL_AVI
+       if DO_AVI && DO_LOCAL_AVI
            f1 = getframe(fh1);
            for k=1:FRAME_REPEATS
                aviobj2 = addframe(aviobj2,f1); % Save to avi
