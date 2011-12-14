@@ -1,5 +1,6 @@
 [Simultaneous Planning Localization And Mapping For Unmanned Aerial Vehicles](http://rip11.wikidot.com/simultaneous-planning-localization-and-mapping-for-unmanned)
 ---
+Authors: Bill, Kyel, Sam, Will
 The goal of the project is to implement a planning technique into the SLAM framework, using a local planner to direct the path towards the global exploration goal. This work is motivated to improve SLAM performance in uncertain or rapidly changing environments, such as search and rescue missions in a forest using a UAV.
 
 This simulator is written as part of a research assignment for the class [Robotics Intelligence & Planning](http://rip11.wikidot.com)

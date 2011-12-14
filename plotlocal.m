@@ -1,5 +1,5 @@
-function h = plotlocal(obs, goal, path, closedist, bounds, h)
-if (nargin == 4 || (nargin > 4 && isempty(bounds)))
+function h = plotlocal(obs, goal, biggoal, path, closedist, bounds, h)
+if (nargin == 5 || (nargin > 5 && isempty(bounds)))
     minx = min([path(:,1); goal(1)]);
     miny = min([path(:,2); goal(2)]);
     maxx = max([path(:,1); goal(1)]);
@@ -30,7 +30,7 @@ for i = 1:length(path(:,1))
         pathtoplot(i,:) = [path(i,1) path(i,2) interp2((1:sizex)+minx-1, (1:sizey)+miny-1, cost, path(i,1), path(i,2))];
     end
 end
-if (nargin == 6)
+if (nargin == 7)
     figure(h)
     hold off
 else
@@ -48,6 +48,10 @@ end
 if (goal(1) >= minx && goal(1) <= maxx && goal(2) >= miny && goal(2) <= maxy)
 %     plot3(goal(1),goal(2),interp2((1:sizex)+minx-1,(1:sizey)+miny-1,cost,goal(1),goal(2))+.2,'p','MarkerEdgeColor','c','MarkerFaceColor','c','MarkerSize',10);
     plot(goal(1), goal(2), 'p','MarkerEdgeColor','c','MarkerFaceColor','c','MarkerSize',10);
+end
+if (biggoal(1) >= minx && biggoal(1) <= maxx && biggoal(2) >= miny && biggoal(2) <= maxy)
+%     plot3(biggoal(1),biggoal(2),interp2((1:sizex)+minx-1,(1:sizey)+miny-1,cost,biggoal(1),biggoal(2))+.2,'p','MarkerEdgeColor','c','MarkerFaceColor','c','MarkerSize',10);
+    plot(biggoal(1), biggoal(2), 'p','MarkerEdgeColor','r','MarkerFaceColor','r','MarkerSize',10);
 end
 if (exist('pathtoplot', 'var'))
 %     plot3(pathtoplot(:,1), pathtoplot(:,2), pathtoplot(:,3)+.2, 'k-', 'LineWidth', 5);

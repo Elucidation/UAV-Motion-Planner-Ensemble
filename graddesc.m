@@ -1,6 +1,6 @@
 function [x delf] = graddesc(func, x0, goal)
 step = 20;
-maxstep = 0.2;
+maxstep = 0.5;
 delftol = 1e-3;
 dxtol = 1e-3;
 goaltol = 1;

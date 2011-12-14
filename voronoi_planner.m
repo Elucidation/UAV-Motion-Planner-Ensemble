@@ -1,4 +1,4 @@
-function [local_goal,termination_flag,VX,VY,VXnew,VYnew] = voronoi_planner(trees,robot,goal,threshold)
+function [local_goal,termination_flag,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(trees,robot,goal,threshold,step)
 % INPUT
 % trees	: An Nx2 vector containing the X-Y coordinates of the trees
 % robot	: A 1x2 vector containing the X-Y coordinates of the robot
@@ -64,9 +64,11 @@ for i=1:m       %Loop through each cell
         if (j == k)
             if(c{i}(1) ~= 1 && c{i}(j) ~= 1)
                 edges(c{i}(1)-1,c{i}(j)-1) = 1;
+                edges(c{i}(j)-1,c{i}(1)-1) = 1;
             end
         elseif (c{i}(j) ~=1 && c{i}(j+1) ~= 1)
             edges(c{i}(j)-1,c{i}(j+1)-1) = 1;
+            edges(c{i}(j+1)-1,c{i}(j)-1) = 1;
         end
     end
 end
@@ -91,29 +93,12 @@ for i=1:n
 %                 end
                 if (closeto(v(i,:),v(j,:),o_trees(k,:),threshold))
                     edges(i,j) = 0;
+                    edges(j,i) = 0;
                     break
                 end
             end
         end
     end
-end
-
-[VXnew VYnew] = make_lines(v,edges);
-
-% Merge close edges
-for i=1:n
-	for j=1:n
-		if((edges(i,j) == 1 || edges(j,i) == 1) && sqrt((v(i,1)-v(j,1))^2 + (v(i,2)-v(j,2))^2) < 1)
-			for k=1:n
-				if (edges(i,k) == 1 || edges(j,k) == 1 || edges(k,i) == 1 || edges(k,j) == 1)
-					edges(i,k) = 1;
-					edges(j,k) = 1;
-					edges(k,i) = 1;
-					edges(k,j) = 1;
-				end
-			end
-		end
-	end
 end
 
 %Remove vertices that have been completely pruned out (ie, have no edges)
@@ -143,14 +128,65 @@ for j = 1:n
     end
 end
 
+[VXnew VYnew] = make_lines(v,edges);
+
+% Merge close edges
+for i=1:n
+	for j=1:n
+		if((edges(i,j) == 1 || edges(j,i) == 1) && sqrt((v(i,1)-v(j,1))^2 + (v(i,2)-v(j,2))^2) < 1)
+			for k=1:n
+				if (edges(i,k) == 1 || edges(j,k) == 1 || edges(k,i) == 1 || edges(k,j) == 1)
+					edges(i,k) = 1;
+					edges(j,k) = 1;
+					edges(k,i) = 1;
+					edges(k,j) = 1;
+				end
+            end
+        elseif (sqrt((v(i,1)-v(j,1))^2 + (v(i,2)-v(j,2))^2) < 0.25)
+            edges(i,j) = 1;
+            edges(j,i) = 1;
+			for k=1:n
+				if (edges(i,k) == 1 || edges(j,k) == 1 || edges(k,i) == 1 || edges(k,j) == 1)
+					edges(i,k) = 1;
+					edges(j,k) = 1;
+					edges(k,i) = 1;
+					edges(k,j) = 1;
+				end
+            end
+		end
+	end
+end
+
+% [VXnew VYnew] = make_lines(vnew,edgesnew);
+
 % Check to see if the robot is connected to the goal
 [reached_goal] = vertex_connect(min_distance(vnew,robot),min_distance(vnew,goal),edgesnew);
+path = voronoi_astar(min_distance(vnew,robot),min_distance(vnew,goal),vnew,edgesnew);
+PX = [];
+PY = [];
+for i = 2:length(path)
+    PX = [PX, [vnew(path(i-1),1); vnew(path(i),1)]];
+    PY = [PY, [vnew(path(i-1),2); vnew(path(i),2)]];
+end
+    
+
+if (reached_goal && ~isempty(path))
+
+    d = 0;
+    i = 2;
+    next = path(1);
+    while (d < step && i <= length(path))
+        d = d + norm(vnew(path(i-1),:)-vnew(path(i),:));
+        next = path(i);
+        i = i + 1;
+    end
+    local_goal = vnew(next,:);
 
 % Select the next best vertex to navigate to
-[next_v,score] = next_vertex(min_distance(vnew,robot),min_distance(vnew,goal),edgesnew,v,20,0);
+% [next_v,score] = next_vertex(min_distance(vnew,robot),min_distance(vnew,goal),edgesnew,vnew,3,0);
 
-if (reached_goal == 1 && next_v ~= (min_distance(vnew,robot)))
-    local_goal = vnew(next_v,:);
+% if (reached_goal == 1 && next_v ~= (min_distance(vnew,robot)))
+%     local_goal = vnew(next_v,:);
 else
     termination_flag = 1;
 end
