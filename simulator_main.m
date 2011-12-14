@@ -9,7 +9,7 @@ close all; clear ; clc;
 %  Globally - A Voronoi diagram is built based on 'all objects ever seen' and their estimated locations
 %    This planner A*/DFS nodes to the global goal, choosing a local goal avoiding some global minima
 %  Locally - A Potential Field is built based on currently visible obstacle uncertainties & distances to robot
-%    This planner is used to guide a robot to the local goal, on a smaller step size than global plan
+$    This planner is used to guide a robot to the local goal, on a smaller step size than global plan
 
 % Right now the noise function only takes into account number of times point has previously been viewed
 % It would be interesting to make noise also a function of distance, which can be implemented easily
@@ -21,6 +21,7 @@ close all; clear ; clc;
 % RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
 reset(RandStream.getDefaultStream)
 % for i = 1:15;rand;end
+
 %% USER DEFINED Values
 
 % Simulator
