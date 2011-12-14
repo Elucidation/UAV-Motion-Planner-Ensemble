@@ -19,42 +19,52 @@ close all; clear all; clc;
 %% RANDOM SEED
 % Reset random generator to initial state for repeatability of tests
 %RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
-RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', 293));
+SEED = 293;
+RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', SEED));
 %% USER DEFINED Values
 
 % Simulator
 TURNS = 1000; % Number of turns to simulate
-N = 100; % Number of points in playing field
+N = 1000; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
 global_goal = [90 90]; % Global goal position (must be in BBOX)
 
 % Robot
 robot_pos = [10 10]; % x,y position
 robot_rov = 15; % Range of view
-DMAX = 5; % max robot movement in one turn
+DMAX = 2; % max robot movement in one turn
 MINDIST = 0.1; % Minimum distance from goal score
 TRAIL_STEP_SIZE = 2; % minimum distance of each trail step
 TREE_SIZE = 1;    %The minimum distance we can pass from a tree. 
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
-LOCAL_GOAL_DIST = robot_rov;
-LOCAL_DIST_FORCE = 1.5; % Amount of force obstacles distance has on potential field
+
+LOCAL_GOAL_DIST_MAX = robot_rov; % Max Distance to choose local goal from a* plan
+LOCAL_GOAL_DIST_MIN = 0.1; % Min distance to choose local goal from
+LOCAL_GOAL_DIST_DEGRADE = 0.5; % Rate of choosing closer goals when stuck in minima
+LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MAX; % Current distance for choosing local goal (decays/changes)
+LOCAL_GOAL_DIST_RECOVER = 6; %Number of turns for LOCAL_GOAL_DIST to recover to robot_rov after being stuck
+STUCK_TIME = 30; %Number of points in a row that must be near each other to be considered stuck
+
+
+
+
 LOCAL_DIST_FORCE_MIN = 1.5;
 LOCAL_DIST_FORCE_MAX = 3;
+LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN; % Amount of force obstacles distance has on potential field
 LOCAL_DIST_FORCE_STEP = 1;
-LOCAL_STUCK_MINIMA_THRESHOLD = 0.01; % Threshold at which local_goal_path std considered stuck
 LOCAL_DIST_FORCE_DEGRADE_RATE = 0.9; % Rate per turn of reduction of LOCAL_DIST_FORCE
-STUCK_TIME = 30; %Number of points in a row that must be near each other to be considered stuck
-STUCK_RECOVER_TIME = 6; %Number of turns for LOCAL_GOAL_DIST to recover to robot_rov after being stuck
+LOCAL_STUCK_MINIMA_THRESHOLD = 0.01; % Threshold at which local_goal_path std considered stuck
+
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
 SHOW_ACTUAL_OBSTACLES = false; % whether to plot grount truth position of obstacles or not
 DO_LOCAL = true; % plot local planner contour figure
 SHOW_LOCAL_CONTOUR = true; % Plot only local area of contour versus entire BBOX
-FIG_SIZE = [660 420]*2; % Both Figure sizes
-FIG_POS1 = [50 100]; % Local figure position
-FIG_POS2 = [60 100]; % Global figure position
-LEGEND_POS = 'EastOutside';
+FIG_SIZE = [590 660]*2; % Both Figure sizes
+FIG_POS1 = [50 10]; % Local figure position
+FIG_POS2 = [60 10]; % Global figure position
+LEGEND_POS = 'NorthWest';
 
 % AVI FILES
 COMPRESSION = 'FFDS'; % Use 'None' for no compression (only simple way to run on Win7/Linux, need to install ffdshow for option 'FFDS' )
@@ -68,6 +78,8 @@ FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate be
 [noiseFilt sigmaV] = noiseFilter(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
 %sigmaV = @(x) 0; % Zero sigma function
 LOW_NOISE_CONFIDENCE_THRESHOLD = 0.01; % Threshold of average noise of 
+
+save(sprintf('setupN%i',N)); % Saves user-def variables for the run
 
 %% SETUP
 getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones(1,N)*(x2-x1); ones(1,N)*(y2-y1)];
@@ -208,10 +220,18 @@ for i = 1:TURNS
    else
        LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN;
    end
+   
+   % Check if local path is stuck in minima, if so change force & local
+   % goal to closer
    if (sum(std(local_goal_path).^2) < LOCAL_STUCK_MINIMA_THRESHOLD)
        if (LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP < LOCAL_DIST_FORCE_MAX)
            LOCAL_DIST_FORCE = LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP;
            fprintf('Force up : %g\n' , LOCAL_DIST_FORCE);
+       end
+       if LOCAL_GOAL_DIST*LOCAL_GOAL_DIST_DEGRADE > LOCAL_GOAL_DIST_MIN
+           LOCAL_GOAL_DIST = LOCAL_GOAL_DIST*LOCAL_GOAL_DIST_DEGRADE;
+       else
+           LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MIN;
        end
    end
    % Check stuck criteria
@@ -356,12 +376,14 @@ for i = 1:TURNS
        break
    end
    if (length(robot_trail) > STUCK_TIME && sum(std(robot_trail(end-STUCK_TIME:end,:)).^2) < 0.3) % If last 10 points were roughly same spot, we're stuck and done.
-       disp('Stuck in Loop.')
-       LOCAL_GOAL_DIST = 0.1;
-   elseif (LOCAL_GOAL_DIST < robot_rov)
-       LOCAL_GOAL_DIST = LOCAL_GOAL_DIST + robot_rov/STUCK_RECOVER_TIME;
-       if (LOCAL_GOAL_DIST > robot_rov)
-           LOCAL_GOAL_DIST = robot_rov;
+       disp('Stuck in Loop.') 
+   end
+   
+   % Recover goal distance to normal
+   if (LOCAL_GOAL_DIST < LOCAL_GOAL_DIST_MAX)
+       LOCAL_GOAL_DIST = LOCAL_GOAL_DIST + LOCAL_GOAL_DIST_MAX/LOCAL_GOAL_DIST_RECOVER;
+       if (LOCAL_GOAL_DIST > LOCAL_GOAL_DIST_MAX)
+           LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MAX;
        end
    end
    %pause
@@ -371,11 +393,11 @@ end
 %% Close AVI files
 if DO_AVI
     aviobj = close(aviobj);
-    fprintf('Saved global voronoi path and robot movement overlay movie to ''%s''\n',Global_filename);
+    fprintf('\nSaved global voronoi path and robot movement overlay movie to ''%s'' : ',Global_filename);
     fprintf('Global (Voronoi) Path Plan with %i obstacles\n',N);
     if DO_LOCAL_AVI
         aviobj2 = close(aviobj2);
-        fprintf('Saved local potential field path movie to ''%s''\n',Local_filename);
+        fprintf('Saved local potential field path movie to ''%s'' : ',Local_filename);
         fprintf('Local (Potential Field) Path Plan with %i obstacles\n',N);
     end
 end
