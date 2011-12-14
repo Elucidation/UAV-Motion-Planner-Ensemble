@@ -42,11 +42,11 @@ objects = [objects; points_around([robot(1,1),goal(1,2)],n,d,o); points_around([
 % temp = [goal(1,1),robot(1,2)];
 % objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
 
-% Debug line to show points
-[VX, VY] = voronoi(objects(:,1),objects(:,2));
-
 % SAM - Keep only unique along x/y
 objects = unique(objects,'rows');
+
+% Debug line to show points
+[VX, VY] = voronoi(objects(:,1),objects(:,2));
 
 % Perform Voronoi decomposition of the explored region
 [v,c] = voronoin(objects);

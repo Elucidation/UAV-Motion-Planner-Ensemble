@@ -18,13 +18,13 @@ close all; clear ; clc;
 
 %% RANDOM SEED
 % Reset random generator to initial state for repeatability of tests
-RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
-
+%RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
+RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', 293));
 %% USER DEFINED Values
 
 % Simulator
 TURNS = 1000; % Number of turns to simulate
-N = 1000; % Number of points in playing field
+N = 100; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
 global_goal = [90 90]; % Global goal position (must be in BBOX)
 
@@ -33,7 +33,7 @@ robot_pos = [10 10]; % x,y position
 robot_rov = 15; % Range of view
 DMAX = 2; % max robot movement in one turn
 MINDIST = 0.1; % Minimum distance from goal score
-TRAIL_STEP_SIZE = 0.1; % minimum distance of each trail step
+TRAIL_STEP_SIZE = 2; % minimum distance of each trail step
 TREE_SIZE = 1;    %The minimum distance we can pass from a tree. 
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
@@ -43,7 +43,7 @@ STUCK_RECOVER_TIME = 6; %Number of turns for LOCAL_GOAL_DIST to recover to robot
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
 DO_LOCAL = false; % plot local planner contour figure
-FIG_SIZE = [1900 1050];%[560 420]*1.5; % Both Figure sizes
+FIG_SIZE = [1200 650];%[560 420]*1.5; % Both Figure sizes
 FIG_POS1 = [10 65];%[50 150]; % Local figure position
 FIG_POS2 = [10 65];%[920 150]; % Global figure position
 LEGEND_POS = 'EastOutside';
@@ -51,14 +51,14 @@ LEGEND_POS = 'EastOutside';
 % AVI FILES
 Global_filename = sprintf('simAll_2D_6_ROV%i_N%i.avi',robot_rov,N); 
 Local_filename = sprintf('simAll_contour_6_ROV%i_N%i.avi',robot_rov,N);
-DO_AVI = false; % write any avi files at all (Global & Local)
+DO_AVI = true; % write any avi files at all (Global & Local)
 DO_LOCAL_AVI = false; % write contour avi file
 FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate below 5 which fails on avifile('fps',<5))
 
 % Noise Function
 [noiseFilt sigmaV] = noiseFilter(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
 %sigmaV = @(x) 0; % Zero sigma function
-
+LOW_NOISE_CONFIDENCE_THRESHOLD = 0.1; % Threshold of average noise of 
 
 %% SETUP
 getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones(1,N)*(x2-x1); ones(1,N)*(y2-y1)];
@@ -150,13 +150,20 @@ for i = 1:TURNS
    %% RUN PLANNERS---------------------------------------------------------
    
    %%% VORONOI PLANNER - Determine Local Goal given known obstacles, and global goal
-   % obstacleEstimate' has every obstacle ever seen
-   [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleEstimate', robot_pos, global_goal, TREE_SIZE*1.2, LOCAL_GOAL_DIST);
+   
+   % Average Noise 'distance' of visible obstacles
+   avgNoiseVisibleObstacles = sum(sqrt(sum( noise(:,viewCurrent~=0).^2  ,1))) / sum(viewCurrent);
+   
+   if (avgNoiseVisibleObstacles > LOW_NOISE_CONFIDENCE_THRESHOLD)   
+    [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleEstimate', robot_pos, global_goal, TREE_SIZE*1.2, LOCAL_GOAL_DIST);
+   else
+       disp('Low noise - continuing previous Voronoi path');
+   end
 %    local_goal = robot_pos+20*(global_goal-robot_pos)/getDist(robot_pos,global_goal); % 10% towards global_goal
 
    if noPathExists
-       disp('No Path exists, game off');
-       break
+       disp('No Path exists, waiting for less uncertainty');
+       continue;
    end
    % If Voronoi is being bad, ignore it
    if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
@@ -275,8 +282,12 @@ for i = 1:TURNS
            robot_trail(end+1,:) = robot_pos; % Keep history of robot positions;
        end
        if getDist(robot_pos,global_goal) < MINDIST || getDist(robot_pos,global_goal) < (DMAX-d) % Found the goal!
-           fprintf('You made it in %i steps.\n',i);
-           foundGoal = 1;
+           if foundGoal == 1
+               disp('Almost there...');
+           else
+               fprintf('You made it in %i steps.\n',i);
+           end
+           foundGoal = foundGoal + 1;
            robot_pos = global_goal;
            robot_trail(end+1,:) = robot_pos;
            break
@@ -302,10 +313,10 @@ for i = 1:TURNS
    end
    
    %% Check End State or Stuck State
-   if (foundGoal == 1) % If we found goal, we're done!
+   if (foundGoal == 2) % If we found goal, we're done!
        break
    end
-   if (length(robot_trail) >= STUCK_TIME && sum(std(robot_trail(end-STUCK_TIME:end,:)).^2) < 0.3) % If last 10 points were roughly same spot, we're stuck and done.
+   if (length(robot_trail) > STUCK_TIME && sum(std(robot_trail(end-STUCK_TIME:end,:)).^2) < 0.3) % If last 10 points were roughly same spot, we're stuck and done.
        disp('Stuck in Loop.')
        LOCAL_GOAL_DIST = 0.1;
    elseif (LOCAL_GOAL_DIST < robot_rov)
@@ -315,12 +326,7 @@ for i = 1:TURNS
        end
    end
    
-   if (i > 50)
-       i = i;
-   end
-%    pause(0.5); 
-   %local_goal_path
-%    pause
+   pause(0.0001); % For update graphics, any pause >0 works
 end
 
 %% Close AVI files
