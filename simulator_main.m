@@ -19,7 +19,7 @@ close all; clear all; clc;
 %% RANDOM SEED
 % Reset random generator to initial state for repeatability of tests
 %RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
-SEED = 293;
+SEED = 6723;
 RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', SEED));
 %% USER DEFINED Values
 
@@ -27,17 +27,21 @@ RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', SEED));
 TURNS = 2000; % Number of turns to simulate
 N = 200; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
-global_goal = [90 90]; % Global goal position (must be in BBOX)
+global_goal = [50 50]; % Global goal position (must be in BBOX)
 MINDIST = 0.01; % Minimum distance for robot from goal score consider win
 
 % Robot
-robot_pos = [10 10]; % x,y position
+robot_pos = [90 10]; % x,y position
 robot_rov = 15; % Range of view
 DMAX = 2; % max robot movement in one turn
-TRAIL_STEP_SIZE = 2; % minimum distance of each trail step % Robot still traveld DMAX steps (just only saves trail every trail-step-size)
-TREE_SIZE = 1;    %The minimum distance we can pass from a tree. 
+TRAIL_STEP_SIZE = 0.8; % minimum distance of each trail step % Robot still traveld DMAX steps (just only saves trail every trail-step-size)
+TREE_SIZE = 1.2;    %The minimum distance we can pass from a tree. 
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
+
+% This doesn't work well because it sees a no-pass, goes away from it and
+% forgets it's no pass and tries to go back (gets stuck in loops)
+USE_VISIBLE_OBSTACLES_ONLY = false; % Voronoi global only uses visible obstacles (instead of all known-of obstacles)
 
 % Stuck Criteria for voronoi local node on A* based on stuck in local 
 LOCAL_GOAL_DIST_MAX = robot_rov/2; % Max Distance to choose local goal from a* plan
@@ -49,7 +53,7 @@ STUCK_TIME = 30; %Number of points in a row that must be near each other to be c
 
 % Stuck Criteria for obstacle distance forces on potential field
 LOCAL_DIST_FORCE_MIN = 1;
-LOCAL_DIST_FORCE_MAX = 1;
+LOCAL_DIST_FORCE_MAX = 2;
 LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN; % Amount of force obstacles distance has on potential field
 LOCAL_DIST_FORCE_STEP = 1;
 LOCAL_DIST_FORCE_DEGRADE_RATE = 0.9; % Rate per turn of reduction of LOCAL_DIST_FORCE
@@ -68,8 +72,8 @@ LEGEND_POS = 'NorthWest';
 
 % AVI FILES
 COMPRESSION = 'FFDS'; % Use 'None' for no compression (only simple way to run on Win7/Linux, need to install ffdshow for option 'FFDS' )
-Global_filename = sprintf('simAll_2D_8_ROV%i_N%i_C.avi',robot_rov,N); 
-Local_filename = sprintf('simAll_contour_8_ROV%i_N%i_C.avi',robot_rov,N);
+Global_filename = sprintf('simAll_2D_12_ROV%i_N%i_C.avi',robot_rov,N); 
+Local_filename = sprintf('simAll_contour_12_ROV%i_N%i_C.avi',robot_rov,N);
 DO_AVI = true; % write any avi files at all (Global & Local)
 DO_LOCAL_AVI = true && SHOW_LOCAL_FIGURE; % write contour avi file
 FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate below 5 which fails on avifile('fps',<5))
@@ -83,10 +87,12 @@ LOW_NOISE_CONFIDENCE_THRESHOLD = 0.01; % Threshold of average noise, DO NOT USE,
 
 %% SETUP
 getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones(1,N)*(x2-x1); ones(1,N)*(y2-y1)];
+%                                                center + 
+getRandNormalPoints = @(N,x1,y1,x2,y2) repmat([(x2-x1)/2 (y2-y1)/2],N,1)' + randn(2,N)*min(x2-x1,y2-y1)/5;
 getDist = @(a,b) sqrt((b(:,2)-a(2)).^2 + (b(:,1)-a(1)).^2); % a must be 2 elemnts, b can be vector of 2 cols x N rows
-obstacles = getRandPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
-%load obstacle2;
-%load obstacles;
+%obstacles = getRandPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
+obstacles = getRandNormalPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
+%load obstacle2; %load obstacles;
 % obstacles = [10 15; 
 %              10 5;
 %              10 10;
@@ -145,7 +151,7 @@ fprintf(2,'        Green dot - Last known observed position of obstacle (connect
 fprintf(2,'Blue dotted-lines - Voronoi diagram\n\n');
 
 for i = 1:TURNS
-    pause(0.0001); % For update graphics, any pause >0 works
+   pause(0.0001); % For update graphics, any pause >0 works
    fprintf('TURN %i : ',i);
    
    % Calculate obstacle visibility etc. based on position
@@ -182,27 +188,33 @@ for i = 1:TURNS
        noPathExists = false;
        VX = [];VY = [];VXnew = [];VYnew = [];PX = [];PY = [];
        
-   elseif (avgNoiseVisibleObstacles > LOW_NOISE_CONFIDENCE_THRESHOLD) || getDist(robot_pos,local_goal) < DMAX % if very confident (low noise) or no obstacles
-       [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleEstimate', robot_pos, global_goal, TREE_SIZE*1.2, LOCAL_GOAL_DIST);
-       % If no path exists and uncertainty is below min threshold, assume
-       % we're stuck for good
-       if noPathExists 
-           if sum(std(local_goal_path).^2) < LOCAL_STUCK_MINIMA_THRESHOLD
-               disp('No Path exists, game off.');
-               break;
-           else
-               disp('No Path exists, waiting for uncertain obstacles to converge.');
-               continue;
-           end
+   elseif (avgNoiseVisibleObstacles > LOW_NOISE_CONFIDENCE_THRESHOLD) || (~noPathExists && getDist(robot_pos,local_goal) < DMAX) % if very confident (low noise) or no obstacles
+       if USE_VISIBLE_OBSTACLES_ONLY
+           [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleCurrent', robot_pos, global_goal, TREE_SIZE*1.2, LOCAL_GOAL_DIST);
+       else
+           [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleEstimate', robot_pos, global_goal, TREE_SIZE*1.2, LOCAL_GOAL_DIST);
        end
-       % If Voronoi is being bad, ignore it
-       if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
-           local_goal = global_goal; % global goal is closer than local goal
-       end
+       
    else
        disp('Low noise - continuing previous Voronoi path');
    end
+   % If no path exists and uncertainty is below min threshold, assume
+   % we're stuck for good
+   if noPathExists 
+       if (avgNoiseVisibleObstacles < LOW_NOISE_CONFIDENCE_THRESHOLD)
+           disp('No Path exists, game off.');
+           break;
+       else
+           disp('No Path exists, waiting for uncertain obstacles to converge.');
+           continue;
+       end
+   end
    
+   % If Voronoi is being bad, ignore it
+   if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
+       local_goal = global_goal; % global goal is closer than local goal
+   end
+
    %%% LOCAL PLANNER - must come before Update Robot (needs local_goal and robot position)
    
    local_goal_path = localplan(robot_pos, local_goal, obstacleObjects, LOCAL_DIST_FORCE); % Only given those obstacles it currently sees
@@ -267,7 +279,11 @@ for i = 1:TURNS
    end
    
    % Observed Obstacles
-   observedObsH = scatter(obstacleEstimate(1,:),obstacleEstimate(2,:),'g','filled');
+   if USE_VISIBLE_OBSTACLES_ONLY
+       observedObsH = scatter(obstacleCurrent(1,:),obstacleCurrent(2,:),'g','filled');
+   else
+       observedObsH = scatter(obstacleEstimate(1,:),obstacleEstimate(2,:),'g','filled');
+   end
    axis('equal'); axis(AX);
    
    % Plot connector line between ground truth to observed

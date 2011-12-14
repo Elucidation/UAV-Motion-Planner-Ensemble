@@ -91,7 +91,7 @@ for i=1:n
 %                         break;
 %                     end
 %                 end
-                if (closeto(v(i,:),v(j,:),o_trees(k,:),threshold) && ~closeto(v(i,:),v(j,:),robot,threshold)) % unless it's too close to robot, then keep it.
+                if (closeto(v(i,:),v(j,:),o_trees(k,:),threshold))% && ~closeto(v(i,:),v(j,:),robot,threshold)) % unless it's too close to robot, then keep it.
                     edges(i,j) = 0;
                     edges(j,i) = 0;
                     break
