@@ -9,7 +9,7 @@ close all; clear ; clc;
 %  Globally - A Voronoi diagram is built based on 'all objects ever seen' and their estimated locations
 %    This planner A*/DFS nodes to the global goal, choosing a local goal avoiding some global minima
 %  Locally - A Potential Field is built based on currently visible obstacle uncertainties & distances to robot
-$    This planner is used to guide a robot to the local goal, on a smaller step size than global plan
+%    This planner is used to guide a robot to the local goal, on a smaller step size than global plan
 
 % Right now the noise function only takes into account number of times point has previously been viewed
 % It would be interesting to make noise also a function of distance, which can be implemented easily
@@ -18,14 +18,12 @@ $    This planner is used to guide a robot to the local goal, on a smaller step 
 
 %% RANDOM SEED
 % Reset random generator to initial state for repeatability of tests
-% RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
-reset(RandStream.getDefaultStream)
-% for i = 1:15;rand;end
+RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
 
 %% USER DEFINED Values
 
 % Simulator
-TURNS = 20000; % Number of turns to simulate
+TURNS = 1000; % Number of turns to simulate
 N = 1000; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
 global_goal = [90 90]; % Global goal position (must be in BBOX)
@@ -39,6 +37,9 @@ TRAIL_STEP_SIZE = 0.1; % minimum distance of each trail step
 TREE_SIZE = 1;    %The minimum distance we can pass from a tree. 
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
+LOCAL_GOAL_DIST = robot_rov;
+STUCK_TIME = 30; %Number of poitns in a row that must be near each other to be considered stuck
+STUCK_RECOVER_TIME = 6; %Number of turns for LOCAL_GOAL_DIST to recover to robot_rov after being stuck
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
 DO_LOCAL = false; % plot local planner contour figure
@@ -150,7 +151,7 @@ for i = 1:TURNS
    
    %%% VORONOI PLANNER - Determine Local Goal given known obstacles, and global goal
    % obstacleEstimate' has every obstacle ever seen
-   [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleEstimate', robot_pos, global_goal, TREE_SIZE*1.2, robot_rov);
+   [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleEstimate', robot_pos, global_goal, TREE_SIZE*1.2, LOCAL_GOAL_DIST);
 %    local_goal = robot_pos+20*(global_goal-robot_pos)/getDist(robot_pos,global_goal); % 10% towards global_goal
 
    if noPathExists
@@ -304,9 +305,14 @@ for i = 1:TURNS
    if (foundGoal == 1) % If we found goal, we're done!
        break
    end
-   if (length(robot_trail) >= 50 && sum(std(robot_trail(end-50:end,:)).^2) < 0.3) % If last 10 points were roughly same spot, we're stuck and done.
+   if (length(robot_trail) >= STUCK_TIME && sum(std(robot_trail(end-STUCK_TIME:end,:)).^2) < 0.3) % If last 10 points were roughly same spot, we're stuck and done.
        disp('Stuck in Loop.')
-       break
+       LOCAL_GOAL_DIST = 0.1;
+   elseif (LOCAL_GOAL_DIST < robot_rov)
+       LOCAL_GOAL_DIST = LOCAL_GOAL_DIST + robot_rov/STUCK_RECOVER_TIME;
+       if (LOCAL_GOAL_DIST > robot_rov)
+           LOCAL_GOAL_DIST = robot_rov;
+       end
    end
    
    if (i > 50)

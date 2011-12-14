@@ -81,10 +81,11 @@ while (~done)
     end
 end
 path = [];
-for i = 1:length(solution)
-    path = [path solution{i}.vert];
+if (iscell(solution))
+    for i = 1:length(solution)
+        path = [path solution{i}.vert];
+    end
 end
-
 end
 
 
