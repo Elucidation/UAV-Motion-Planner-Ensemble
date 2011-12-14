@@ -32,14 +32,14 @@ global_goal = [90 90]; % Global goal position (must be in BBOX)
 % Robot
 robot_pos = [10 10]; % x,y position
 robot_rov = 15; % Range of view
-DMAX = 2; % max robot movement in one turn
+DMAX = 0.5; % max robot movement in one turn
 MINDIST = 0.1; % Minimum distance from goal score
-TRAIL_STEP_SIZE = 2; % minimum distance of each trail step
+TRAIL_STEP_SIZE = 0.5; % minimum distance of each trail step % Robot still traveld DMAX steps (just only saves trail every trail-step-size)
 TREE_SIZE = 1;    %The minimum distance we can pass from a tree. 
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
 
-LOCAL_GOAL_DIST_MAX = robot_rov; % Max Distance to choose local goal from a* plan
+LOCAL_GOAL_DIST_MAX = robot_rov/2; % Max Distance to choose local goal from a* plan
 LOCAL_GOAL_DIST_MIN = 0.1; % Min distance to choose local goal from
 LOCAL_GOAL_DIST_DEGRADE = 0.5; % Rate of choosing closer goals when stuck in minima
 LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MAX; % Current distance for choosing local goal (decays/changes)
@@ -49,17 +49,17 @@ STUCK_TIME = 30; %Number of points in a row that must be near each other to be c
 
 
 
-LOCAL_DIST_FORCE_MIN = 1.5;
-LOCAL_DIST_FORCE_MAX = 3;
+LOCAL_DIST_FORCE_MIN = 1;
+LOCAL_DIST_FORCE_MAX = 1;
 LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN; % Amount of force obstacles distance has on potential field
 LOCAL_DIST_FORCE_STEP = 1;
 LOCAL_DIST_FORCE_DEGRADE_RATE = 0.9; % Rate per turn of reduction of LOCAL_DIST_FORCE
-LOCAL_STUCK_MINIMA_THRESHOLD = 0.01; % Threshold at which local_goal_path std considered stuck
+LOCAL_STUCK_MINIMA_THRESHOLD = 0.1; % Threshold at which local_goal_path std considered stuck
 
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
 SHOW_ACTUAL_OBSTACLES = false; % whether to plot grount truth position of obstacles or not
-DO_LOCAL = true; % plot local planner contour figure
+DO_LOCAL = false; % plot local planner contour figure
 SHOW_LOCAL_CONTOUR = true; % Plot only local area of contour versus entire BBOX
 FIG_SIZE = [590 660]*2; % Both Figure sizes
 FIG_POS1 = [50 10]; % Local figure position
@@ -70,16 +70,16 @@ LEGEND_POS = 'NorthWest';
 COMPRESSION = 'FFDS'; % Use 'None' for no compression (only simple way to run on Win7/Linux, need to install ffdshow for option 'FFDS' )
 Global_filename = sprintf('simAll_2D_7_ROV%i_N%i_C.avi',robot_rov,N); 
 Local_filename = sprintf('simAll_contour_7_ROV%i_N%i_C.avi',robot_rov,N);
-DO_AVI = true; % write any avi files at all (Global & Local)
+DO_AVI = false; % write any avi files at all (Global & Local)
 DO_LOCAL_AVI = true; % write contour avi file
 FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate below 5 which fails on avifile('fps',<5))
 
 % Noise Function
 [noiseFilt sigmaV] = noiseFilter(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
 %sigmaV = @(x) 0; % Zero sigma function
-LOW_NOISE_CONFIDENCE_THRESHOLD = 0.01; % Threshold of average noise of 
+LOW_NOISE_CONFIDENCE_THRESHOLD = 0.0; % Threshold of average noise, DO NOT USE, Skipping voronoi breaks the LOCAL_DIST_FORCE stuff
 
-save(sprintf('setupN%i',N)); % Saves user-def variables for the run
+%save(sprintf('setupN%i',N)); % Saves user-def variables for the run
 
 %% SETUP
 getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones(1,N)*(x2-x1); ones(1,N)*(y2-y1)];
@@ -143,6 +143,7 @@ fprintf(2,'        Green dot - Last known observed position of obstacle (connect
 fprintf(2,'Blue dotted-lines - Voronoi diagram\n\n');
 
 for i = 1:TURNS
+    pause(0.0001); % For update graphics, any pause >0 works
    fprintf('TURN %i : ',i);
    
    % Calculate obstacle visibility etc. based on position
@@ -387,7 +388,6 @@ for i = 1:TURNS
        end
    end
    %pause
-   pause(0.0001); % For update graphics, any pause >0 works
 end
 
 %% Close AVI files

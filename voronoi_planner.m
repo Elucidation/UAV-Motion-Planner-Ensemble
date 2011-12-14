@@ -91,7 +91,7 @@ for i=1:n
 %                         break;
 %                     end
 %                 end
-                if (closeto(v(i,:),v(j,:),o_trees(k,:),threshold))
+                if (closeto(v(i,:),v(j,:),o_trees(k,:),threshold) && ~closeto(v(i,:),v(j,:),robot,threshold)) % unless it's too close to robot, then keep it.
                     edges(i,j) = 0;
                     edges(j,i) = 0;
                     break
@@ -192,43 +192,8 @@ else
 end
 end % End function declaration
 
-% function [in_box] = bounding_box(i,j,k)
-% % INPUT
-% % i : 2D point
-% % j : 2D point
-% % k : 2D point to be tested if inside the bounding box for i and j
-% % OUTPUT
-% % in_box : 1 if the point is inside the box, 0 otherwise
-% a = [i(1),i(2)];
-% b = [i(1),j(2)];
-% c = [j(1),j(2)];
-% d = [j(1),i(2)];
-% 
-% if (b(1) > d(1))
-%     temp = b;
-%     b = d;
-%     d = temp;
-%     temp = c;
-%     c = a;
-%     a = temp;
-% end
-% if (b(2) > a(2))
-%     temp = a;
-%     b = a;
-%     a = temp;
-%     temp = c;
-%     c = d;
-%     d = temp;
-% end
-% 
-% if (k(1) < c(1) && k(2) < a(2) && k(1) > a(1) && k(2) > b(2))
-%     in_box = 1;
-% else
-%     in_box = 0;
-% end
-% end
-
 function isclose = closeto(p1, p2, p0, threshold)
+% find if p0 is within threshold distance of line segment p0-p1
 minx = min(p1(1),p2(1));
 miny = min(p1(2),p2(2));
 maxx = max(p1(1),p2(1));
