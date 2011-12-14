@@ -38,30 +38,36 @@ TREE_SIZE = 1;    %The minimum distance we can pass from a tree.
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
 LOCAL_GOAL_DIST = robot_rov;
-LOCAL_DIST_FORCE = 2; % Amount of force obstacles distance has on potential field
-STUCK_TIME = 30; %Number of poitns in a row that must be near each other to be considered stuck
+LOCAL_DIST_FORCE = 1.5; % Amount of force obstacles distance has on potential field
+LOCAL_DIST_FORCE_MIN = 1.5;
+LOCAL_DIST_FORCE_MAX = 3;
+LOCAL_DIST_FORCE_STEP = 1;
+LOCAL_STUCK_MINIMA_THRESHOLD = 0.01; % Threshold at which local_goal_path std considered stuck
+LOCAL_DIST_FORCE_DEGRADE_RATE = 0.9; % Rate per turn of reduction of LOCAL_DIST_FORCE
+STUCK_TIME = 30; %Number of points in a row that must be near each other to be considered stuck
 STUCK_RECOVER_TIME = 6; %Number of turns for LOCAL_GOAL_DIST to recover to robot_rov after being stuck
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
 SHOW_ACTUAL_OBSTACLES = false; % whether to plot grount truth position of obstacles or not
 DO_LOCAL = true; % plot local planner contour figure
 SHOW_LOCAL_CONTOUR = true; % Plot only local area of contour versus entire BBOX
-FIG_SIZE = [560 420]*1.5; % Both Figure sizes
-FIG_POS1 = [50 150]; % Local figure position
-FIG_POS2 = [920 150]; % Global figure position
+FIG_SIZE = [660 420]*2; % Both Figure sizes
+FIG_POS1 = [50 100]; % Local figure position
+FIG_POS2 = [60 100]; % Global figure position
 LEGEND_POS = 'EastOutside';
 
 % AVI FILES
-Global_filename = sprintf('simAll_2D_6_ROV%i_N%i.avi',robot_rov,N); 
-Local_filename = sprintf('simAll_contour_6_ROV%i_N%i.avi',robot_rov,N);
-DO_AVI = false; % write any avi files at all (Global & Local)
-DO_LOCAL_AVI = false; % write contour avi file
+COMPRESSION = 'FFDS'; % Use 'None' for no compression (only simple way to run on Win7/Linux, need to install ffdshow for option 'FFDS' )
+Global_filename = sprintf('simAll_2D_7_ROV%i_N%i_C.avi',robot_rov,N); 
+Local_filename = sprintf('simAll_contour_7_ROV%i_N%i_C.avi',robot_rov,N);
+DO_AVI = true; % write any avi files at all (Global & Local)
+DO_LOCAL_AVI = true; % write contour avi file
 FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate below 5 which fails on avifile('fps',<5))
 
 % Noise Function
 [noiseFilt sigmaV] = noiseFilter(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
 %sigmaV = @(x) 0; % Zero sigma function
-LOW_NOISE_CONFIDENCE_THRESHOLD = 0; % Threshold of average noise of 
+LOW_NOISE_CONFIDENCE_THRESHOLD = 0.01; % Threshold of average noise of 
 
 %% SETUP
 getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones(1,N)*(x2-x1); ones(1,N)*(y2-y1)];
@@ -94,9 +100,9 @@ checkRepeat0It = 0;
 
 % Setup AVI files
 if DO_AVI
-    aviobj = avifile(Global_filename,'compression','None','fps',5); % Global AVI
+    aviobj = avifile(Global_filename,'compression',COMPRESSION,'fps',5); % Global AVI
     if DO_LOCAL_AVI
-        aviobj2 = avifile(Local_filename,'compression','None','fps',5); % Local AVI
+        aviobj2 = avifile(Local_filename,'compression',COMPRESSION,'fps',5); % Local AVI
     end
 end
 
@@ -186,9 +192,29 @@ for i = 1:TURNS
    
    
    %%% LOCAL PLANNER - must come before Update Robot (needs local_goal and robot position)
+   
+   
+   
    % Only given those obstacles it currently sees
    local_goal_path = localplan(robot_pos, local_goal, obstacleObjects, LOCAL_DIST_FORCE);
    %local_goal_path = localplan(robot_pos, global_goal, obstacleObjects);
+   
+   % If current path is stuck in a local minima, increase effect of
+   % obstacle distances
+   
+   % Update local force effect
+   if (LOCAL_DIST_FORCE*LOCAL_DIST_FORCE_DEGRADE_RATE > LOCAL_DIST_FORCE_MIN)
+       LOCAL_DIST_FORCE = LOCAL_DIST_FORCE*LOCAL_DIST_FORCE_DEGRADE_RATE;
+   else
+       LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN;
+   end
+   if (sum(std(local_goal_path).^2) < LOCAL_STUCK_MINIMA_THRESHOLD)
+       if (LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP < LOCAL_DIST_FORCE_MAX)
+           LOCAL_DIST_FORCE = LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP;
+           fprintf('Force up : %g\n' , LOCAL_DIST_FORCE);
+       end
+   end
+   % Check stuck criteria
    if size(local_goal_path,1) == 1
        checkRepeat0It = checkRepeat0It + 1;
        if (checkRepeat0It > 10)
@@ -267,11 +293,11 @@ for i = 1:TURNS
    
    
    %% START LOCAL PLOT - 3D Contour path for LOCAL Planner (ie. to Local goal)
-   if DO_LOCAL
+   if DO_LOCAL && size(local_goal_path,1) > 1 % also can't plot if there is no path
        if SHOW_LOCAL_CONTOUR
-           plotlocal(obstacleObjects, local_goal, global_goal, local_goal_path, TREE_SIZE, '' ,fh1); % new figure 3d contour
+           plotlocal(obstacleObjects, local_goal, global_goal, local_goal_path, LOCAL_DIST_FORCE, '' ,fh1); % new figure 3d contour
        else
-           plotlocal(obstacleObjects, local_goal, global_goal, local_goal_path, TREE_SIZE, AX ,fh1); % new figure 3d contour
+           plotlocal(obstacleObjects, local_goal, global_goal, local_goal_path, LOCAL_DIST_FORCE, AX ,fh1); % new figure 3d contour
        end
        axis('equal'); axis(AX);
        view(azel);
@@ -298,8 +324,6 @@ for i = 1:TURNS
        if getDist(robot_pos,global_goal) < MINDIST || getDist(robot_pos,global_goal) < (DMAX-d) % Found the goal!
            if foundGoal == 1
                disp('Almost there...');
-           else
-               fprintf('You made it in %i steps.\n',i);
            end
            foundGoal = foundGoal + 1;
            robot_pos = global_goal;
@@ -328,6 +352,7 @@ for i = 1:TURNS
    
    %% Check End State or Stuck State
    if (foundGoal == 2) % If we found goal, we're done!
+       fprintf('You made it in %i steps.\n',i);
        break
    end
    if (length(robot_trail) > STUCK_TIME && sum(std(robot_trail(end-STUCK_TIME:end,:)).^2) < 0.3) % If last 10 points were roughly same spot, we're stuck and done.
@@ -339,7 +364,7 @@ for i = 1:TURNS
            LOCAL_GOAL_DIST = robot_rov;
        end
    end
-   pause
+   %pause
    pause(0.0001); % For update graphics, any pause >0 works
 end
 
