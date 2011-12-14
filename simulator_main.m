@@ -1,4 +1,4 @@
-close all; clear ; clc;
+close all; clear all; clc;
 % What this file does:
 % Sets up a 2D simulation of a robot navigating an obstacle filled area
 % Robot is considered a point with a 360 range of view
@@ -24,7 +24,7 @@ RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', 293));
 
 % Simulator
 TURNS = 1000; % Number of turns to simulate
-N = 100; % Number of points in playing field
+N = 500; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
 global_goal = [90 90]; % Global goal position (must be in BBOX)
 
@@ -38,27 +38,30 @@ TREE_SIZE = 1;    %The minimum distance we can pass from a tree.
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
 LOCAL_GOAL_DIST = robot_rov;
+LOCAL_DIST_FORCE = 2; % Amount of force obstacles distance has on potential field
 STUCK_TIME = 30; %Number of poitns in a row that must be near each other to be considered stuck
 STUCK_RECOVER_TIME = 6; %Number of turns for LOCAL_GOAL_DIST to recover to robot_rov after being stuck
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
-DO_LOCAL = false; % plot local planner contour figure
-FIG_SIZE = [1200 650];%[560 420]*1.5; % Both Figure sizes
-FIG_POS1 = [10 65];%[50 150]; % Local figure position
-FIG_POS2 = [10 65];%[920 150]; % Global figure position
+SHOW_ACTUAL_OBSTACLES = false; % whether to plot grount truth position of obstacles or not
+DO_LOCAL = true; % plot local planner contour figure
+SHOW_LOCAL_CONTOUR = true; % Plot only local area of contour versus entire BBOX
+FIG_SIZE = [560 420]*1.5; % Both Figure sizes
+FIG_POS1 = [50 150]; % Local figure position
+FIG_POS2 = [920 150]; % Global figure position
 LEGEND_POS = 'EastOutside';
 
 % AVI FILES
 Global_filename = sprintf('simAll_2D_6_ROV%i_N%i.avi',robot_rov,N); 
 Local_filename = sprintf('simAll_contour_6_ROV%i_N%i.avi',robot_rov,N);
-DO_AVI = true; % write any avi files at all (Global & Local)
+DO_AVI = false; % write any avi files at all (Global & Local)
 DO_LOCAL_AVI = false; % write contour avi file
 FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate below 5 which fails on avifile('fps',<5))
 
 % Noise Function
 [noiseFilt sigmaV] = noiseFilter(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
 %sigmaV = @(x) 0; % Zero sigma function
-LOW_NOISE_CONFIDENCE_THRESHOLD = 0.1; % Threshold of average noise of 
+LOW_NOISE_CONFIDENCE_THRESHOLD = 0; % Threshold of average noise of 
 
 %% SETUP
 getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones(1,N)*(x2-x1); ones(1,N)*(y2-y1)];
@@ -184,7 +187,7 @@ for i = 1:TURNS
    
    %%% LOCAL PLANNER - must come before Update Robot (needs local_goal and robot position)
    % Only given those obstacles it currently sees
-   local_goal_path = localplan(robot_pos, local_goal, obstacleObjects, TREE_SIZE);
+   local_goal_path = localplan(robot_pos, local_goal, obstacleObjects, LOCAL_DIST_FORCE);
    %local_goal_path = localplan(robot_pos, global_goal, obstacleObjects);
    if size(local_goal_path,1) == 1
        checkRepeat0It = checkRepeat0It + 1;
@@ -224,8 +227,7 @@ for i = 1:TURNS
    observedObsH = scatter(obstacleEstimate(1,:),obstacleEstimate(2,:),'g','filled');
    
    hold on;
-   % Ground truth - black
-   groundTruthH = scatter( obstacles(1,:),obstacles(2,:),'k.');
+   
    
    % Plot connector line between ground truth to observed
    gt = obstacles(:,views~=0);
@@ -243,8 +245,16 @@ for i = 1:TURNS
    % Local & Global Goals
    localGoalH = scatter(local_goal(1),local_goal(2),100,'cp','filled'); % Plot local goal
    globalGoalH = scatter(global_goal(1),global_goal(2),150,'rp','filled'); % Plot global goal 
+   
+   if SHOW_ACTUAL_OBSTACLES
+       % Ground truth - black
+       groundTruthH = scatter( obstacles(1,:),obstacles(2,:),'k.');
+       legend([robotPosH localGoalH globalGoalH observedObsH groundTruthH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location',LEGEND_POS);
+   else
+       legend([robotPosH localGoalH globalGoalH observedObsH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions','Location',LEGEND_POS);
+   end
+   
    title(sprintf('%i Obstacles, Turn %i : Distance to Global Goal = %g\nClosest Encounter = %g @ P(%g,%g)',N,i,getDist(robot_pos,global_goal),closestEncounter,closestPos(1),closestPos(2)));
-   legend([robotPosH localGoalH globalGoalH observedObsH groundTruthH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location',LEGEND_POS);
    hold off;
    
    % write AVI of GLOBAL
@@ -258,7 +268,11 @@ for i = 1:TURNS
    
    %% START LOCAL PLOT - 3D Contour path for LOCAL Planner (ie. to Local goal)
    if DO_LOCAL
-       plotlocal(obstacleObjects, local_goal, global_goal, local_goal_path, TREE_SIZE, AX ,fh1); % new figure 3d contour
+       if SHOW_LOCAL_CONTOUR
+           plotlocal(obstacleObjects, local_goal, global_goal, local_goal_path, TREE_SIZE, '' ,fh1); % new figure 3d contour
+       else
+           plotlocal(obstacleObjects, local_goal, global_goal, local_goal_path, TREE_SIZE, AX ,fh1); % new figure 3d contour
+       end
        axis('equal'); axis(AX);
        view(azel);
        view(2);
@@ -325,7 +339,7 @@ for i = 1:TURNS
            LOCAL_GOAL_DIST = robot_rov;
        end
    end
-   
+   pause
    pause(0.0001); % For update graphics, any pause >0 works
 end
 
