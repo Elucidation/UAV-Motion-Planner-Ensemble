@@ -24,14 +24,14 @@ RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', 293));
 
 % Simulator
 TURNS = 1000; % Number of turns to simulate
-N = 500; % Number of points in playing field
+N = 100; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
 global_goal = [90 90]; % Global goal position (must be in BBOX)
 
 % Robot
 robot_pos = [10 10]; % x,y position
 robot_rov = 15; % Range of view
-DMAX = 2; % max robot movement in one turn
+DMAX = 5; % max robot movement in one turn
 MINDIST = 0.1; % Minimum distance from goal score
 TRAIL_STEP_SIZE = 2; % minimum distance of each trail step
 TREE_SIZE = 1;    %The minimum distance we can pass from a tree. 
@@ -371,7 +371,11 @@ end
 %% Close AVI files
 if DO_AVI
     aviobj = close(aviobj);
+    fprintf('Saved global voronoi path and robot movement overlay movie to ''%s''\n',Global_filename);
+    fprintf('Global (Voronoi) Path Plan with %i obstacles\n',N);
     if DO_LOCAL_AVI
         aviobj2 = close(aviobj2);
+        fprintf('Saved local potential field path movie to ''%s''\n',Local_filename);
+        fprintf('Local (Potential Field) Path Plan with %i obstacles\n',N);
     end
 end
