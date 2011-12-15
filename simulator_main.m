@@ -1,4 +1,4 @@
-close all; clear all; clc;
+close all; clear ; clc;
 % What this file does:
 % Sets up a 2D simulation of a robot navigating an obstacle filled area
 % Robot is considered a point with a 360 range of view
@@ -19,41 +19,42 @@ close all; clear all; clc;
 %% RANDOM SEED
 % Reset random generator to initial state for repeatability of tests
 %RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
-SEED = 6723;
+SEED = 23426;
 RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', SEED));
 %% USER DEFINED Values
 
 % Simulator
 TURNS = 2000; % Number of turns to simulate
-N = 200; % Number of points in playing field
+N = 100; % Number of points in playing field
 BBOX = [0 0 100 100]; % playing field bounding box [x1 y1 x2 y2]
-global_goal = [50 50]; % Global goal position (must be in BBOX)
-MINDIST = 0.01; % Minimum distance for robot from goal score consider win
+global_goal = [50 70]; % Global goal position (must be in BBOX)
+MINDIST = 0.1; % Minimum distance for robot from goal score consider win
 
 % Robot
-robot_pos = [90 10]; % x,y position
-robot_rov = 15; % Range of view
-DMAX = 2; % max robot movement in one turn
-TRAIL_STEP_SIZE = 0.8; % minimum distance of each trail step % Robot still traveld DMAX steps (just only saves trail every trail-step-size)
-TREE_SIZE = 1.2;    %The minimum distance we can pass from a tree. 
+robot_pos = [10 10]; % x,y position
+robot_rov = 30; % Range of view
+DMAX = robot_rov/5; % max robot movement in one turn
+TRAIL_STEP_SIZE = 0.2; % minimum distance of each trail step % Robot still traveld DMAX steps (just only saves trail every trail-step-size)
+TREE_SIZE = 2.2;    %The minimum distance we can pass from a tree. 
                     %Affects which Voronoi edges are pruned in global
                     %and cost of getting close to a tree in local
+TOO_CLOSE_TO_TREE = 0.5; %Closest we can approach a tree without hitting it
 
 % This doesn't work well because it sees a no-pass, goes away from it and
 % forgets it's no pass and tries to go back (gets stuck in loops)
 USE_VISIBLE_OBSTACLES_ONLY = false; % Voronoi global only uses visible obstacles (instead of all known-of obstacles)
 
 % Stuck Criteria for voronoi local node on A* based on stuck in local 
-LOCAL_GOAL_DIST_MAX = robot_rov/2; % Max Distance to choose local goal from a* plan
-LOCAL_GOAL_DIST_MIN = 0.1; % Min distance to choose local goal from
+LOCAL_GOAL_DIST_MAX = robot_rov/1.9; % Max Distance to choose local goal from a* plan
+LOCAL_GOAL_DIST_MIN = 0.1; % Min distance to choose local goal from (PS, this has to be > 0, as 0 will return the current location as the local goal!)
 LOCAL_GOAL_DIST_DEGRADE = 0.5; % Rate of choosing closer goals when stuck in minima
 LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MAX; % Current distance for choosing local goal (decays/changes)
 LOCAL_GOAL_DIST_RECOVER = 6; %Number of turns for LOCAL_GOAL_DIST to recover to robot_rov after being stuck
 STUCK_TIME = 30; %Number of points in a row that must be near each other to be considered stuck
 
 % Stuck Criteria for obstacle distance forces on potential field
-LOCAL_DIST_FORCE_MIN = 1;
-LOCAL_DIST_FORCE_MAX = 2;
+LOCAL_DIST_FORCE_MIN = TREE_SIZE;
+LOCAL_DIST_FORCE_MAX = 2 * TREE_SIZE;
 LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN; % Amount of force obstacles distance has on potential field
 LOCAL_DIST_FORCE_STEP = 1;
 LOCAL_DIST_FORCE_DEGRADE_RATE = 0.9; % Rate per turn of reduction of LOCAL_DIST_FORCE
@@ -61,27 +62,28 @@ LOCAL_STUCK_MINIMA_THRESHOLD = 0.1; % Threshold at which local_goal_path std con
 
 
 % FIGURES (LOCAL - contour, and GLOBAL - 2d trail)
-SHOW_ACTUAL_OBSTACLES = true; % whether to plot grount truth position of obstacles or not
+SHOW_ACTUAL_OBSTACLES = true; % whether to plot ground truth position of obstacles or not
 SHOW_VORONOI_OVERLAY = true;
 SHOW_LOCAL_FIGURE = false; % plot local planner contour figure
-SHOW_LOCAL_ON_GLOBAL_AXIS = true; % Plot local area of contour on entire BBOX versus local
-FIG_SIZE = [590 660]*2; % Both Figure sizes
-FIG_POS1 = [50 10]; % Local figure position
-FIG_POS2 = [60 10]; % Global figure position
-LEGEND_POS = 'NorthWest';
+SHOW_LOCAL_ON_GLOBAL_AXIS = false; % Plot local area of contour on entire BBOX versus local
+FIG_SIZE = 1.5*[640 800];%[1900 1200]; % Both Figure sizes
+FIG_POS1 = [10 10];%[1910 10];% Local figure position
+FIG_POS2 = [550 10]; %[10 10];% Global figure position
+LEGEND_ON = false; % Whether to show legend or not
+LEGEND_POS = 'SouthOutside';%'NorthWest';
 
 % AVI FILES
 COMPRESSION = 'FFDS'; % Use 'None' for no compression (only simple way to run on Win7/Linux, need to install ffdshow for option 'FFDS' )
-Global_filename = sprintf('simAll_2D_12_ROV%i_N%i_C.avi',robot_rov,N); 
-Local_filename = sprintf('simAll_contour_12_ROV%i_N%i_C.avi',robot_rov,N);
-DO_AVI = true; % write any avi files at all (Global & Local)
+Global_filename = sprintf('simAll_2D_Present_ROV%i_N%i_C.avi',robot_rov,N); 
+Local_filename = sprintf('simAll_Contour_Present_ROV%i_N%i_C.avi',robot_rov,N);
+DO_AVI = false; % write any avi files at all (Global & Local)
 DO_LOCAL_AVI = true && SHOW_LOCAL_FIGURE; % write contour avi file
 FRAME_REPEATS = 2; % Number of times to repeat frame in avi (slower framerate below 5 which fails on avifile('fps',<5))
 
 % Noise Function
-[noiseFilt sigmaV] = noiseFilter(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
+[noiseFilt sigmaV] = noiseFilterDist(); %noiseFilt = makeNoiseFilter(0,0.4,30,10,1.4);
 %sigmaV = @(x) 0; % Zero sigma function
-LOW_NOISE_CONFIDENCE_THRESHOLD = 0.01; % Threshold of average noise, DO NOT USE, Skipping voronoi breaks the LOCAL_DIST_FORCE stuff
+LOW_NOISE_CONFIDENCE_THRESHOLD = 0.7; % Threshold of average noise, SOLVED, YOU CAN USE AGAIN --> DO NOT USE, Skipping voronoi breaks the LOCAL_DIST_FORCE stuff
 
 %save(sprintf('setupN%i',N)); % Saves user-def variables for the run
 
@@ -90,7 +92,7 @@ getRandPoints = @(N,x1,y1,x2,y2) [ones(1,N)*x1; ones(1,N)*y1] + rand(2,N).*[ones
 %                                                center + 
 getRandNormalPoints = @(N,x1,y1,x2,y2) repmat([(x2-x1)/2 (y2-y1)/2],N,1)' + randn(2,N)*min(x2-x1,y2-y1)/5;
 getDist = @(a,b) sqrt((b(:,2)-a(2)).^2 + (b(:,1)-a(1)).^2); % a must be 2 elemnts, b can be vector of 2 cols x N rows
-%obstacles = getRandPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
+% obstacles = getRandPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
 obstacles = getRandNormalPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial random distribution of points
 %load obstacle2; %load obstacles;
 % obstacles = [10 15; 
@@ -98,6 +100,16 @@ obstacles = getRandNormalPoints(N,BBOX(1),BBOX(2),BBOX(3),BBOX(4)); % Initial ra
 %              10 10;
 %              10 2;
 %              10 18;]';
+% obstacles = zeros(2,36);
+% obstacles(1, 1:10) = 5;
+% obstacles(1, 11:20) = 14;
+% obstacles(1, 21:28) = 6:13;
+% obstacles(1, 29:36) = 13:-1:6;
+% obstacles(2, 1:10) = 5:14;
+% obstacles(2, 11:20) = 14:-1:5;
+% obstacles(2, 21:28) = 5;
+% obstacles(2, 29:36) = 14;
+
 
 views = zeros(1,N); % Number of times point has been seen before, this affects the noiseFilter as value passed into viewsCount (more = less noise)
 obstacleEstimate = zeros(2,N); % Last (estimated) Known position of obstacles
@@ -105,6 +117,10 @@ obstacleLastKnown = zeros(2,N); % Last known all obstacles
 distances = zeros(1, N); % Init current distances between robot and obstacles
 robot_trail = robot_pos;%zeros(TURNS,2); % Initialize robot position history
 local_goal_path = [];
+
+%% HACKS - GET RID OF THESE
+noPathExists = false;
+%local_goal = global_goal;
 
 
 % Axis & Views
@@ -150,18 +166,22 @@ fprintf(2,'        Black dot - Ground truth positions of obstacles (unknown to U
 fprintf(2,'        Green dot - Last known observed position of obstacle (connected to ground truth position with green dotted line)\n');
 fprintf(2,'Blue dotted-lines - Voronoi diagram\n\n');
 
+
+
+
 for i = 1:TURNS
-   pause(0.0001); % For update graphics, any pause >0 works
    fprintf('TURN %i : ',i);
    
    % Calculate obstacle visibility etc. based on position
    distances = getDist(robot_pos,obstacles');
+   visibleDistances = distances(distances<robot_rov);
    views(distances<robot_rov) = views(distances<robot_rov) + 1;
    viewCurrent = zeros(1,N); % localPlanner view sees only currently visible obstacles
    viewCurrent(distances<robot_rov) = 1; % only 1's and 0's for obstacles currently visible or not
    
    % The noise based on view count for all obstacles
-   noise = noiseFilt(  views );
+   noise = noiseFilt(  views , distances' , 0.1 );
+   %noise = noiseFilt(  views , distances(distances<robot_rov) );
    
    % update noise only for those currently seeing 
    obstacleLastKnown(:,viewCurrent~=0) = obstacles(:,viewCurrent~=0) + noise(:,viewCurrent~=0);
@@ -174,7 +194,8 @@ for i = 1:TURNS
        obstacleObjects{k}.x = obstacleCurrent(1,k);
        obstacleObjects{k}.y = obstacleCurrent(2,k);
        v = views(logical(viewCurrent));
-       obstacleObjects{k}.sig = sigmaV(v(k));
+       obstacleObjects{k}.sig = sigmaV(v(k),visibleDistances(k),0.1);
+       %obstacleObjects{k}.sig = sigmaV(v(k));
    end
    
    %% RUN PLANNERS---------------------------------------------------------
@@ -185,10 +206,10 @@ for i = 1:TURNS
    avgNoiseVisibleObstacles = sum(sqrt(sum( noise(:,viewCurrent~=0).^2  ,1))) / sum(viewCurrent);
    if size(obstacleCurrent,2) == 0  % If no obstacles present...
        local_goal = global_goal; %robot_pos+20*(global_goal-robot_pos)/getDist(robot_pos,global_goal); % 10% towards global_goal
-       noPathExists = false;
        VX = [];VY = [];VXnew = [];VYnew = [];PX = [];PY = [];
        
-   elseif (avgNoiseVisibleObstacles > LOW_NOISE_CONFIDENCE_THRESHOLD) || (~noPathExists && getDist(robot_pos,local_goal) < DMAX) % if very confident (low noise) or no obstacles
+   elseif i == 1 || (avgNoiseVisibleObstacles > LOW_NOISE_CONFIDENCE_THRESHOLD) || (~noPathExists && getDist(robot_pos,local_goal) < DMAX || ... % if very confident (low noise) or no obstacles
+           LOCAL_GOAL_DIST < LOCAL_GOAL_DIST_MAX || LOCAL_DIST_FORCE > LOCAL_DIST_FORCE_MIN)    %Ensure that if we're stuck in a local minimum, we use voronoi anyway
        if USE_VISIBLE_OBSTACLES_ONLY
            [local_goal,noPathExists,VX,VY,VXnew,VYnew,PX,PY] = voronoi_planner(obstacleCurrent', robot_pos, global_goal, TREE_SIZE*1.2, LOCAL_GOAL_DIST);
        else
@@ -200,66 +221,62 @@ for i = 1:TURNS
    end
    % If no path exists and uncertainty is below min threshold, assume
    % we're stuck for good
+   noMove = false;
+   done = false;
    if noPathExists 
        if (avgNoiseVisibleObstacles < LOW_NOISE_CONFIDENCE_THRESHOLD)
            disp('No Path exists, game off.');
-           break;
+           noMove = true;
+           done = true;
        else
            disp('No Path exists, waiting for uncertain obstacles to converge.');
-           continue;
+           noMove = true;
        end
-   end
-   
-   % If Voronoi is being bad, ignore it
-   if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
-       local_goal = global_goal; % global goal is closer than local goal
    end
 
    %%% LOCAL PLANNER - must come before Update Robot (needs local_goal and robot position)
-   
-   local_goal_path = localplan(robot_pos, local_goal, obstacleObjects, LOCAL_DIST_FORCE); % Only given those obstacles it currently sees
+   if (~noMove)
+       % If Voronoi is being bad, ignore it
+       if (getDist(robot_pos,local_goal) > getDist(robot_pos,global_goal))
+           local_goal = global_goal; % global goal is closer than local goal
+       end
+       
+       local_goal_path = localplan(robot_pos, local_goal, obstacleObjects, LOCAL_DIST_FORCE); % Only given those obstacles it currently sees
 
-   %%% If current path is stuck in a local minima, increase effect of obstacle distances
-   % Update local force effect
-   if (LOCAL_DIST_FORCE*LOCAL_DIST_FORCE_DEGRADE_RATE > LOCAL_DIST_FORCE_MIN)
-       LOCAL_DIST_FORCE = LOCAL_DIST_FORCE*LOCAL_DIST_FORCE_DEGRADE_RATE;
-   else
-       LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN;
-   end
-   
-   % Check if local path is stuck in minima, if so change force & local
-   % goal to closer
-   if (sum(std(local_goal_path).^2) < LOCAL_STUCK_MINIMA_THRESHOLD)
-       if (LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP < LOCAL_DIST_FORCE_MAX)
-           LOCAL_DIST_FORCE = LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP;
-       end
-       if LOCAL_GOAL_DIST*LOCAL_GOAL_DIST_DEGRADE > LOCAL_GOAL_DIST_MIN
-           LOCAL_GOAL_DIST = LOCAL_GOAL_DIST*LOCAL_GOAL_DIST_DEGRADE;
+       %%% If current path is stuck in a local minima, increase effect of obstacle distances
+       % Update local force effect
+       if (LOCAL_DIST_FORCE*LOCAL_DIST_FORCE_DEGRADE_RATE > LOCAL_DIST_FORCE_MIN)
+           LOCAL_DIST_FORCE = LOCAL_DIST_FORCE*LOCAL_DIST_FORCE_DEGRADE_RATE;
        else
-           LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MIN;
+           LOCAL_DIST_FORCE = LOCAL_DIST_FORCE_MIN;
        end
-       fprintf('Force : %g, Goal-Dist : %g\n' , LOCAL_DIST_FORCE,LOCAL_GOAL_DIST);
+
+       % Check if local path is stuck in minima, if so change force & local
+       % goal to closer
+       if (sum(std(local_goal_path).^2) < LOCAL_STUCK_MINIMA_THRESHOLD)
+           if (LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP < LOCAL_DIST_FORCE_MAX)
+               LOCAL_DIST_FORCE = LOCAL_DIST_FORCE + LOCAL_DIST_FORCE_STEP;
+           end
+           if LOCAL_GOAL_DIST*LOCAL_GOAL_DIST_DEGRADE > LOCAL_GOAL_DIST_MIN
+               LOCAL_GOAL_DIST = LOCAL_GOAL_DIST*LOCAL_GOAL_DIST_DEGRADE;
+           else
+               LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MIN;
+           end
+           fprintf('Force : %g, Goal-Dist : %g\n' , LOCAL_DIST_FORCE,LOCAL_GOAL_DIST);
+       end
+    %    % Check stuck criteria
+    %    if size(local_goal_path,1) == 1
+    %        checkRepeat0It = checkRepeat0It + 1;
+    %        if (checkRepeat0It > 10)
+    %            % Stuck in equilibrium, apply nudge towards local goal
+    %            local_goal_path = [local_goal_path;local_goal];
+    %            checkRepeat0It = 0;
+    %        end
+    %    end
    end
-%    % Check stuck criteria
-%    if size(local_goal_path,1) == 1
-%        checkRepeat0It = checkRepeat0It + 1;
-%        if (checkRepeat0It > 10)
-%            % Stuck in equilibrium, apply nudge towards local goal
-%            local_goal_path = [local_goal_path;local_goal];
-%            checkRepeat0It = 0;
-%        end
-%    end
    
    
-   %% Find closest encounter to ground truth obstacles
-   d = 0;
-   for k = 1:N
-       d = getDist(robot_pos,obstacles(:,k)');
-       if d < closestEncounter
-           closestEncounter = d;
-           closestPos = robot_pos;
-       end
-   end
+
    
    
    %% GRAPHICS -----------------------------------------
@@ -273,7 +290,7 @@ for i = 1:TURNS
    % Plot VORONOI LINES
    if SHOW_VORONOI_OVERLAY
        plot(VX,VY,':','Color',[0.8 0.8 0.8]); 
-       plot(PX,PY,'y','LineWidth',3);  
+       plot(PX,PY,'y','LineWidth',5);  
        plot(VXnew,VYnew,'b:');   
        set(fh2(1:end-1),'xliminclude','off','yliminclude','off'); % keep infinite lines clipped
    end
@@ -286,13 +303,13 @@ for i = 1:TURNS
    end
    axis('equal'); axis(AX);
    
-   % Plot connector line between ground truth to observed
-   gt = obstacles(:,views~=0);
-   es = obstacleEstimate;
-   for k = 1:size(es,2)
-       % For each connection (estimate)
-       plot([gt(1,k) es(1,k)],[gt(2,k) es(2,k)],'g:');
-   end
+%    % Plot connector line between ground truth to observed
+%    gt = obstacles(:,views~=0);
+%    es = obstacleEstimate;
+%    for k = 1:size(es,2)
+%        % For each connection (estimate)
+%        plot([gt(1,k) es(1,k)],[gt(2,k) es(2,k)],'g:');
+%    end
    
    % Robot
    plot([robot_trail(robot_trail(:,1)~=0,1); robot_pos(1)],[robot_trail(robot_trail(:,2)~=0,2); robot_pos(2)],'b.-'); % Robot Trail
@@ -300,15 +317,27 @@ for i = 1:TURNS
    drawCircle(robot_pos(1),robot_pos(2), robot_rov, 'b-'); % Robot Field of View (vision range)
    
    % Local & Global Goals
-   localGoalH = scatter(local_goal(1),local_goal(2),100,'cp','filled'); % Plot local goal
-   globalGoalH = scatter(global_goal(1),global_goal(2),150,'rp','filled'); % Plot global goal 
+   if (~noMove)
+        localGoalH = scatter(local_goal(1),local_goal(2),100,'cp','filled'); % Plot local goal
+   end
+   %globalGoalH = scatter(global_goal(1),global_goal(2),150,'rp','filled'); % Plot global goal 
    
    if SHOW_ACTUAL_OBSTACLES
        % Ground truth - black
-       groundTruthH = scatter( obstacles(1,:),obstacles(2,:),'k.');
-       legend([robotPosH localGoalH globalGoalH observedObsH groundTruthH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location',LEGEND_POS);
-   else
-       legend([robotPosH localGoalH globalGoalH observedObsH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions','Location',LEGEND_POS);
+       groundTruthH = scatter( obstacles(1,:),obstacles(2,:),150,'k.');
+       if LEGEND_ON
+           if (noMove)
+               legend([robotPosH globalGoalH observedObsH groundTruthH],'UAV position','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location',LEGEND_POS);
+           else
+               legend([robotPosH localGoalH globalGoalH observedObsH groundTruthH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions', 'Ground Truth Obstacle Positions','Location',LEGEND_POS);
+           end
+       end
+   elseif LEGEND_ON
+       if (noMove)
+           legend([robotPosH globalGoalH observedObsH],'UAV position','Global Goal', 'Observed/Estimated Obstacle Positions','Location',LEGEND_POS);
+       else
+           legend([robotPosH localGoalH globalGoalH observedObsH],'UAV position','Local Goal','Global Goal', 'Observed/Estimated Obstacle Positions','Location',LEGEND_POS);
+       end
    end
    
    title(sprintf('%i Obstacles, Turn %i : Distance to Global Goal = %g\nClosest Encounter = %g @ P(%g,%g)',N,i,getDist(robot_pos,global_goal),closestEncounter,closestPos(1),closestPos(2)));
@@ -345,45 +374,83 @@ for i = 1:TURNS
    end 
    
    %% Update Robot - must be before 
-   d = 0; k = 0;
-   % Update Robot position along local path trail for distance DMAX
-   while d < DMAX
-       if getDist(robot_pos,robot_trail(end,:)) >= TRAIL_STEP_SIZE
-           robot_trail(end+1,:) = robot_pos; % Keep history of robot positions;
-       end
-       if getDist(robot_pos,global_goal) < MINDIST || getDist(robot_pos,global_goal) < (DMAX-d) % Found the goal!
-           if foundGoal == 1
-               disp('Almost there...');
-           end
+   if (~noMove)
+       d = 0; k = 0;
+       % Check if close to goal before
+       if getDist(robot_pos,global_goal) < MINDIST  % Found the goal!
            foundGoal = foundGoal + 1;
-           robot_pos = global_goal;
-           robot_trail(end+1,:) = robot_pos;
-           break
        end
-       
-       if (2+k > size(local_goal_path,1)) % Next path point is further than path exists
-           % Can't go any further so just go to the last point
-           next_pos = local_goal_path(end,:); % choose last position
-           robot_pos = next_pos; % Update position
-           break;
-       end
-       % Next position is point on local goal path
-       next_pos = local_goal_path(2+k,:); % choose next position from local plan
-       d = d + getDist(robot_pos,next_pos); % distance traveled increased by motion
-       k = k + 1; % next point in path
-       % Update position 
-       if (d > DMAX)
-           % robot wants to move too far, so interpolate along distance
-           robot_pos = robot_pos + (DMAX-d+getDist(robot_pos,next_pos))*(next_pos-robot_pos)/getDist(robot_pos,next_pos);
-       else
-          robot_pos = next_pos; 
+       % Update Robot position along local path trail for distance DMAX
+       while (d < DMAX && 2+k <= size(local_goal_path,1))
+           if getDist(robot_pos,global_goal) < MINDIST  % Found the goal!
+               if foundGoal == 1
+                   disp('Almost there...');
+               end
+               foundGoal = foundGoal + 1;
+               robot_pos = global_goal;
+               robot_trail(end+1,:) = robot_pos;
+               break
+           end
+           
+           % Next position is point on local goal path
+           next_pos = local_goal_path(2+k,:); % choose next position from local plan
+           d = d + getDist(robot_pos,next_pos); % distance traveled increased by motion
+           k = k + 1; % next point in path
+           % Update position
+           if (d > DMAX)
+               % robot wants to move too far, so interpolate along distance
+               next_pos = robot_pos + (DMAX-d+getDist(robot_pos,next_pos))*(next_pos-robot_pos)/getDist(robot_pos,next_pos);
+           end
+           
+           %% Find closest encounter to ground truth obstacles
+           p1 = robot_trail(end,:);
+           p2 = next_pos;
+           mindist = Inf;
+           for l = 1:N
+               p0 = obstacles(:,l)';
+               m = (p2(2)-p1(2))/(p2(1)-p1(1));
+               if ((isinf(m) && p0(2) > min(p1(2),p2(2)) && p0(2) < max(p1(2),p2(2))) || ...
+                       (m == 0 && p0(1) > min(p1(1),p2(1)) && p0(1) < max(p1(1),p2(1))))
+                   dist = abs((p2(1)-p1(1))*(p1(2)-p0(2))-(p1(1)-p0(1))*(p2(2)-p1(2)))/sqrt((p2(1)-p1(1))^2+(p2(2)-p1(2))^2);
+               elseif (~isinf(m) && m ~= 0)
+                   xint = (1-m^2)/m * (p1(2) - p0(2) + m*p1(1) - 1/m*p0(1));
+                   yint = m * (xint - p1(1)) + p1(2);
+                   if (xint > min(p1(1),p2(1)) && xint < max(p1(1),p2(1)) && yint > min(p1(2),p2(2)) && yint < max(p1(2),p2(2)))
+                       dist = abs((p2(1)-p1(1))*(p1(2)-p0(2))-(p1(1)-p0(1))*(p2(2)-p1(2)))/sqrt((p2(1)-p1(1))^2+(p2(2)-p1(2))^2);
+                   else
+                       dist = Inf;
+                   end
+               else
+                   dist = Inf;
+               end
+               if (getDist(p2,p0) < dist)
+                   dist = getDist(p2,p0);
+               end
+               if (dist < mindist)
+                   mindist = dist;
+               end
+           end
+           
+           if (mindist > TOO_CLOSE_TO_TREE)
+               if (getDist(robot_trail(end,:),robot_pos) >= TRAIL_STEP_SIZE)
+                   robot_trail(end+1,:) = robot_pos; % Keep history of robot positions;
+               end
+               robot_pos = next_pos;
+               if (mindist < closestEncounter)
+                   closestEncounter = mindist;
+                   closestPos = p2;
+               end
+           else
+               disp('Almost hit a tree, ending this move.');
+               break;
+           end
        end
    end
    
    %% Check End State or Stuck State
    if (foundGoal == 2) % If we found goal, we're done!
        fprintf('You made it in %i steps.\n',i);
-       break
+       done = true;
    end
    if (length(robot_trail) > STUCK_TIME && sum(std(robot_trail(end-STUCK_TIME:end,:)).^2) < 0.3) % If last 10 points were roughly same spot, we're stuck and done.
        disp('Stuck in Loop.') 
@@ -396,7 +463,11 @@ for i = 1:TURNS
            LOCAL_GOAL_DIST = LOCAL_GOAL_DIST_MAX;
        end
    end
+   if (done)
+       break;
+   end
    %pause
+   pause(0.001);
 end
 
 %% Close AVI files

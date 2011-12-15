@@ -27,8 +27,16 @@ n = 16;      %Number of points around each object
 d = 0.1;    %Distance from object for each point
 o = pi/n;   %Offset in radians from 0 for first point
 
-%Draw robot & goal
-objects = [objects; points_around(robot,n,d,o); points_around(goal,n,d,o)];
+%Draw robot & goal, bounding box of area, and add far out points (if
+%there's no path through the forest, maybe we can find one around it!)
+maxx = max(robot(1), goal(1));
+maxy = max(robot(2), goal(2));
+minx = min(robot(1), goal(1));
+miny = min(robot(2), goal(2));
+objects = [objects; points_around([maxx maxy],n,d,o); points_around([maxx miny],n,d,o); points_around([minx maxy],n,d,o); points_around([minx miny],n,d,o)];
+dist = norm(robot-goal);
+objects = [objects; [maxx+dist-0.01 maxy+dist+0.01]; [maxx+dist-0.01 miny-dist+0.01];...
+    [minx-dist+0.01 maxy+dist-0.01]; [minx-dist+0.01 miny-dist-0.01]];
 % temp = robot;
 % %objects=[[objects];[temp(1,1)+1,temp(1,2)-1)];[temp(1,1),temp(1,2)+1];[temp(1,1),temp(
 % objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
@@ -36,11 +44,14 @@ objects = [objects; points_around(robot,n,d,o); points_around(goal,n,d,o)];
 % objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
 
 % Draw bounding box of area
-objects = [objects; points_around([robot(1,1),goal(1,2)],n,d,o); points_around([goal(1,1),robot(1,2)],n,d,o)];
+% objects = [objects; points_around([robot(1,1),goal(1,2)],n,d,o); points_around([goal(1,1),robot(1,2)],n,d,o)];
 % temp = [robot(1,1),goal(1,2)];
 % objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
 % temp = [goal(1,1),robot(1,2)];
 % objects = [[objects];[temp(1,1)+0.1,temp(1,2)];[temp(1,1)+0.05,temp(1,2)+0.1];[temp(1,1)-0.05,temp(1,2)+0.1];[temp(1,1)-0.1,temp(1,2)];[temp(1,1)-0.05,temp(1,2)-0.1];[temp(1,1)+0.05,temp(1,2)-0.1];];
+
+%Add far out points, if there's no path through the forest, maybe we can
+%find one around it!
 
 % SAM - Keep only unique along x/y
 objects = unique(objects,'rows');
@@ -101,11 +112,36 @@ for i=1:n
     end
 end
 
-%Remove vertices that have been completely pruned out (ie, have no edges)
+%Remove vertices that have been completely pruned out (ie, have no edges),
+%or have become orphaned (ie, small number of edges not connected to goal)
 vbad = [];
 for i = 1:n
+    if (any(find(vbad == i)))
+        continue
+    end
     if (~any(edges(i,:)) && ~any(edges(:,i)))
         vbad = [vbad i];
+    elseif (~vertex_connect(i,min_distance(v,goal),edges))
+        count = 0;
+        next = unique([find(edges(i,:)==1) find(edges(:,i)==1)']);
+        oldnext = i;
+        while (~isempty(next) && count < 7)
+            count = count + length(next);
+            newnext = [];
+            for j = next
+                newnext = unique([newnext unique([find(edges(j,:)==1) find(edges(:,j)==1)'])]);
+            end
+            for j = oldnext
+                if (any(find(newnext == j)))
+                    newnext(find(newnext==j)) = [];
+                end
+            end
+            oldnext = unique([oldnext next]);
+            next = newnext;
+        end
+        if (count < 7)
+            vbad = [vbad unique([i oldnext])];
+        end
     end
 end
 vnew = [];
@@ -128,39 +164,43 @@ for j = 1:n
     end
 end
 
-[VXnew VYnew] = make_lines(v,edges);
-
-% Merge close edges
-for i=1:n
-	for j=1:n
-		if((edges(i,j) == 1 || edges(j,i) == 1) && sqrt((v(i,1)-v(j,1))^2 + (v(i,2)-v(j,2))^2) < 1)
-			for k=1:n
-				if (edges(i,k) == 1 || edges(j,k) == 1 || edges(k,i) == 1 || edges(k,j) == 1)
-					edges(i,k) = 1;
-					edges(j,k) = 1;
-					edges(k,i) = 1;
-					edges(k,j) = 1;
-				end
-            end
-        elseif (sqrt((v(i,1)-v(j,1))^2 + (v(i,2)-v(j,2))^2) < 0.25)
-            edges(i,j) = 1;
-            edges(j,i) = 1;
-			for k=1:n
-				if (edges(i,k) == 1 || edges(j,k) == 1 || edges(k,i) == 1 || edges(k,j) == 1)
-					edges(i,k) = 1;
-					edges(j,k) = 1;
-					edges(k,i) = 1;
-					edges(k,j) = 1;
-				end
-            end
-		end
-	end
-end
-
 % [VXnew VYnew] = make_lines(vnew,edgesnew);
+
+% % Merge close edges & vertices
+% for i=1:nnew
+% 	for j=1:nnew
+%         %Merge edges that are close to each other
+% 		if((edgesnew(i,j) == 1 || edgesnew(j,i) == 1) && sqrt((vnew(i,1)-vnew(j,1))^2 + (vnew(i,2)-vnew(j,2))^2) < 1)
+% 			for k=1:nnew
+% 				if (edgesnew(i,k) == 1 || edgesnew(j,k) == 1 || edgesnew(k,i) == 1 || edgesnew(k,j) == 1)
+% 					edgesnew(i,k) = 1;
+% 					edgesnew(j,k) = 1;
+% 					edgesnew(k,i) = 1;
+% 					edgesnew(k,j) = 1;
+% 				end
+%             end
+%         %Merge vertices that are close to each other
+%         elseif (sqrt((vnew(i,1)-vnew(j,1))^2 + (vnew(i,2)-vnew(j,2))^2) < 0.25)
+%             edgesnew(i,j) = 1;
+%             edgesnew(j,i) = 1;
+% 			for k=1:nnew
+% 				if (edgesnew(i,k) == 1 || edges(j,k) == 1 || edgesnew(k,i) == 1 || edgesnew(k,j) == 1)
+% 					edgesnew(i,k) = 1;
+% 					edgesnew(j,k) = 1;
+% 					edgesnew(k,i) = 1;
+% 					edgesnew(k,j) = 1;
+% 				end
+%             end
+% 		end
+% 	end
+% end
+
+[VXnew VYnew] = make_lines(vnew,edgesnew);
 
 % Check to see if the robot is connected to the goal
 [reached_goal] = vertex_connect(min_distance(vnew,robot),min_distance(vnew,goal),edgesnew);
+
+% Run A* planner to find best path to goal
 path = voronoi_astar(min_distance(vnew,robot),min_distance(vnew,goal),vnew,edgesnew);
 PX = [];
 PY = [];
@@ -171,7 +211,7 @@ end
     
 
 if (reached_goal && ~isempty(path))
-
+    %Choose the appropriate vertex for the local goal
     d = 0;
     i = 2;
     next = path(1);
@@ -218,33 +258,33 @@ else
 end
 end
 
-% Recursive depth-first search, can be made iterative if memory is prohibitive
-function [path, at_goal] = depth_first_search(current,edges,goal,current_path)
-% INPUT
-% current : the current vertex to choose the next move from
-% edges   : adjacency matrix
-% goal    : index of goal node
-% current_path : indices of previously explored nodes
-% OUTPUT
-% path : indices of nodes from initial node to goal
-% at_goal : 1 if goal is reached, 0 if goal is not reached
-[m,n] = size(edges);
-at_goal = 0;
-path = [];
-for i=1:m
-    if (edges(current,i) == 1 && ~any(current_path==i))
-        if (i == goal)
-            path = [current_path,goal];
-            at_goal = 1;
-            break;
-        end
-        [path,at_goal] = depth_first_search(i,edges,goal,[current_path,i]);
-        if (at_goal == 1)
-            break;
-        end
-    end
-end
-end
+% % Recursive depth-first search, can be made iterative if memory is prohibitive
+% function [path, at_goal] = depth_first_search(current,edges,goal,current_path)
+% % INPUT
+% % current : the current vertex to choose the next move from
+% % edges   : adjacency matrix
+% % goal    : index of goal node
+% % current_path : indices of previously explored nodes
+% % OUTPUT
+% % path : indices of nodes from initial node to goal
+% % at_goal : 1 if goal is reached, 0 if goal is not reached
+% [m,n] = size(edges);
+% at_goal = 0;
+% path = [];
+% for i=1:m
+%     if (edges(current,i) == 1 && ~any(current_path==i))
+%         if (i == goal)
+%             path = [current_path,goal];
+%             at_goal = 1;
+%             break;
+%         end
+%         [path,at_goal] = depth_first_search(i,edges,goal,[current_path,i]);
+%         if (at_goal == 1)
+%             break;
+%         end
+%     end
+% end
+% end
 
 % Finds the minimum distance vertex from a point
 function [min_vertex] = min_distance(vertices,point)
@@ -307,51 +347,51 @@ while (1)
 end
 end
 
-% Select the next vertex using a heuristic that the next best edge is the
-% one which is in a path of length n reaching a vertex closest to the goal
-function [best,best_score] = next_vertex(start,goal,edges,vertices,depth,path_length)
-% INPUT
-% start : index of starting vertex
-% goal  : index of goal vertex
-% edges : adjacency matrix
-% vertices : xy coordinates of each vertex
-% depth : number of vertices to search in the graph
-% path_length : length of current path
-% OUTPUT
-% next : index of next vertex
-best = start;
-best_score = realmax;
-threshold = 0.5;
-[n,~] = size(edges);
-current_best = 0;
-for i=1:n
-    if (edges(start,i) == 1 || edges(i,start) == 1)
-        from_start = sqrt(((vertices(i,1) - vertices(start,1))^2) + ((vertices(i,2) - vertices(start,2))^2));
-        from_goal = sqrt(((vertices(i,1) - vertices(goal,1))^2) + ((vertices(i,2) - vertices(goal,2))^2));
-        path_length = path_length + from_start;
-        if (i == goal || from_goal < threshold)
-            current_score = path_length - 100000;
-        elseif (depth == 1)
-            current_score = from_goal;
-            
-        else
-            [current_best,current_score] = next_vertex(i,goal,edges,vertices,depth -1,path_length);
-        end
-        if (current_score < best_score && from_start > threshold)
-            best = i;
-            best_score = current_score;
-        elseif (current_score < best_score && from_start <= threshold && current_best ~= 0)
-            best = current_best;
-            best_score = current_score;
-        end
-    end
-end
-end
+% % Select the next vertex using a heuristic that the next best edge is the
+% % one which is in a path of length n reaching a vertex closest to the goal
+% function [best,best_score] = next_vertex(start,goal,edges,vertices,depth,path_length)
+% % INPUT
+% % start : index of starting vertex
+% % goal  : index of goal vertex
+% % edges : adjacency matrix
+% % vertices : xy coordinates of each vertex
+% % depth : number of vertices to search in the graph
+% % path_length : length of current path
+% % OUTPUT
+% % next : index of next vertex
+% best = start;
+% best_score = realmax;
+% threshold = 0.5;
+% [n,~] = size(edges);
+% current_best = 0;
+% for i=1:n
+%     if (edges(start,i) == 1 || edges(i,start) == 1)
+%         from_start = sqrt(((vertices(i,1) - vertices(start,1))^2) + ((vertices(i,2) - vertices(start,2))^2));
+%         from_goal = sqrt(((vertices(i,1) - vertices(goal,1))^2) + ((vertices(i,2) - vertices(goal,2))^2));
+%         path_length = path_length + from_start;
+%         if (i == goal || from_goal < threshold)
+%             current_score = path_length - 100000;
+%         elseif (depth == 1)
+%             current_score = from_goal;
+%             
+%         else
+%             [current_best,current_score] = next_vertex(i,goal,edges,vertices,depth -1,path_length);
+%         end
+%         if (current_score < best_score && from_start > threshold)
+%             best = i;
+%             best_score = current_score;
+%         elseif (current_score < best_score && from_start <= threshold && current_best ~= 0)
+%             best = current_best;
+%             best_score = current_score;
+%         end
+%     end
+% end
+% end
 
 function pts = points_around(point, n, d, o)
 pts = [];
 for ang = o:(2*pi/n):((2*pi+o)*(n-1)/n)
-    pts = [pts; point(1)+d*cos(ang) point(2)+d*sin(ang)];
+    pts = [pts; point(1)+d*cos(ang)+rand*d/10 point(2)+d*sin(ang)-rand*d/10];
 end
 end
 
