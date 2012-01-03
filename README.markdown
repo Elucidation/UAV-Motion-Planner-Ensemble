@@ -5,6 +5,8 @@ Authors: Bill, Kyel, Sam, Will.
 Simulation of a UAV navigating an obstacle-filled environment using [SLAM](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping)
 This will be implemented on a raptor quadcopter Spring 2012, with the intent to use in search and rescue operations in forested environments.
 
+[More Images & Videos](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping)
+
 ![Final simulation Traveled Path](http://i.imgur.com/ASoql.png)
 
 The build progress is documented on the [class wiki](http://rip11.wikidot.com/simultaneous-planning-localization-and-mapping-for-unmanned).
