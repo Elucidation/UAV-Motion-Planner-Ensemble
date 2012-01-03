@@ -1,9 +1,9 @@
 [Simultaneous Planning Localization And Mapping For Unmanned Aerial Vehicles](http://rip11.wikidot.com/simultaneous-planning-localization-and-mapping-for-unmanned)
 ---
-Authors: Bill, Kyel, Sam, Will.
+Authors: Bill, Kyel, Sam, Will. [Final Report](http://cloud.github.com/downloads/Elucidation/UAV-Motion-Planner-Ensemble/GT_RIP_F2011_UAV.pdf)
 
-Simulation of a UAV navigating an obstacle-filled environment using [SLAM](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping)
-This will be implemented on a raptor quadcopter Spring 2012, with the intent to use in search and rescue operations in forested environments.
+This project is a MATLAB Simulator for UAV navigation with vision uncertainty using [SLAM](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping).
+The goal is to implement this on a raptor quadcopter Spring 2012, with the intent to use in search and rescue operations in forested environments.
 
 [More Images & Videos](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping)
 
