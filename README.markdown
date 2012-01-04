@@ -5,7 +5,7 @@ Authors: Bill, Kyel, Sam, Will. [Final Report](http://cloud.github.com/downloads
 This project is a MATLAB Simulator for UAV navigation with vision uncertainty using [SLAM](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping).
 The goal is to implement this on a raptor quadcopter Spring 2012, with the intent to use in search and rescue operations in forested environments.
 
-[More Images & Videos](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping)
+[More Images & Videos](http://elucidation.github.com/UAV-Motion-Planner-Ensemble/)
 
 ![Final simulation Traveled Path](http://i.imgur.com/ASoql.png)
 
