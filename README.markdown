@@ -1,6 +1,8 @@
 [Simultaneous Planning Localization And Mapping For Unmanned Aerial Vehicles](http://rip11.wikidot.com/simultaneous-planning-localization-and-mapping-for-unmanned)
 ---
-Authors: Bill, Kyel, Sam, Will. [Final Report](http://cloud.github.com/downloads/Elucidation/UAV-Motion-Planner-Ensemble/GT_RIP_F2011_UAV.pdf)
+Authors: Bill, Kyel, Sam, Will. [Final Class Report](http://cloud.github.com/downloads/Elucidation/UAV-Motion-Planner-Ensemble/GT_RIP_F2011_UAV.pdf)
+
+Published in ICRA: Kyel Ok, Sameer Ansari, William Gallagher, William Sica, Frank Dellaert, Mike Stilman, ["Path Planning with Uncertainty: Voronoi Uncertainty Fields." IEEE International Conference on Robotics and Automation 2013.](http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=6631230)
 
 This project is a MATLAB Simulator for UAV navigation with vision uncertainty using [SLAM](http://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping).
 The goal is to implement this on a raptor quadcopter Spring 2012, with the intent to use in search and rescue operations in forested environments.
