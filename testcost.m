@@ -1,5 +1,5 @@
 tic;pause(rand)
-RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(toc*1000000)*0+318264));
+RandStream.setGlobalStream(RandStream('mt19937ar', 'Seed', ceil(toc*1000000)*0+318264));
 clear
 close all
 

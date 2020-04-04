@@ -18,9 +18,9 @@ close all; clear ; clc;
 
 %% RANDOM SEED
 % Reset random generator to initial state for repeatability of tests
-%RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
+%RandStream.setGlobalStream(RandStream('mt19937ar', 'Seed', ceil(rand*1000000)));
 SEED = 23426;
-RandStream.setDefaultStream(RandStream('mt19937ar', 'Seed', SEED));
+RandStream.setGlobalStream(RandStream('mt19937ar', 'Seed', SEED));
 %% USER DEFINED Values
 
 % Simulator
